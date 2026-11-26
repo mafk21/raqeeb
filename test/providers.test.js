@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path');
 const h = require('./helpers');
 const { classify } = require('../lib/common');
 const { costOf, rateFor } = require('../lib/pricing');
-const claude = require('../lib/providers/claude'), codex = require('../lib/providers/codex'), cursor = require('../lib/providers/cursor');
+const claude = require('../lib/providers/claude'), codex = require('../lib/providers/codex'), cursor = require('../lib/providers/cursor'), gemini = require('../lib/providers/gemini'), aider = require('../lib/providers/aider'), cline = require('../lib/providers/cline');
 const { providers } = require('../lib/sessions');
 
 test('classify: question means waiting for 2 hours, then done', () => {
@@ -27,7 +27,7 @@ test('every adapter has the documented shape', () => {
     for (const k of ['defaultRoot', 'candidates', 'parse', 'inspect', 'scan']) assert.equal(typeof p[k], 'function', p.id + '.' + k);
     assert.equal(typeof p.experimental, 'boolean');
   }
-  assert.deepEqual(providers.filter(p => p.experimental).map(p => p.id).sort(), ['codex', 'cursor']);
+  assert.deepEqual(providers.filter(p => p.experimental).map(p => p.id).sort(), ['aider', 'cline', 'codex', 'cursor', 'gemini']);
 });
 
 test('claude: task, branch, project, tokens, cost; skips sidechains, wrappers, bad lines', () => {
@@ -85,4 +85,53 @@ test('inspect reports exists / files / recent per provider', () => {
   const i = codex.inspect(root, Date.now());
   assert.equal(i.exists, true); assert.equal(i.files, 1); assert.equal(i.recent, 0);
   assert.equal(codex.inspect(path.join(root, 'nope'), Date.now()).exists, false);
+});
+
+test('gemini: reads a JSONL session, text parts, tokens incl. thoughts, project from .project_root; no cost', () => {
+  const root = h.tmp();
+  h.gemini(root, 'abc123', 's1', h.geminiRows('Add a retry wrapper', 'Done. Should I also add tests?'), 3 * 60000);
+  fs.writeFileSync(path.join(root, 'abc123', '.project_root'), '/home/dev/pipeline');
+  const r = gemini.scan(root);
+  assert.equal(r.length, 1); assert.equal(r[0].id, 'sess-1'); assert.equal(r[0].project, 'pipeline'); assert.equal(r[0].task, 'Add a retry wrapper');
+  assert.equal(r[0].tokensIn, 1200); assert.equal(r[0].tokensOut, 350); assert.equal(r[0].cost, null); assert.equal(r[0].status, 'waiting'); assert.equal(r[0].model, 'gemini-2.5-pro');
+});
+
+test('gemini: reads the older whole-session JSON, skips sub-agent sessions', () => {
+  const root = h.tmp();
+  h.put(path.join(root, 'p1', 'chats', 'session-a.json'), [JSON.stringify({ sessionId: 'a', messages: [{ type: 'user', content: 'Hello task' }, { type: 'gemini', content: 'Reply.' }] })], 1000);
+  h.put(path.join(root, 'p1', 'chats', 'session-b.json'), [JSON.stringify({ sessionId: 'b', kind: 'subagent', messages: [] })], 1000);
+  h.put(path.join(root, 'p1', 'chats', 'notes.json'), ['{}'], 1000);
+  const r = gemini.scan(root); assert.equal(r.length, 1); assert.equal(r[0].task, 'Hello task'); assert.equal(r[0].lastSay, 'Reply.');
+});
+
+test('aider: uses the latest run only; tokens with k suffix; prompt and reply; skips node_modules', () => {
+  const root = h.tmp();
+  h.aider(root, 'cli-tools', h.aiderText('Add a --json flag', 'Added the flag. Want a test too?'), 60000);
+  h.aider(root, 'node_modules/dep', h.aiderText('x', 'y'), 1000);
+  const r = aider.scan(root);
+  assert.equal(r.length, 1); assert.equal(r[0].project, 'cli-tools'); assert.equal(r[0].task, 'Add a --json flag');
+  assert.equal(r[0].lastSay, 'Added the flag. Want a test too?'); assert.equal(r[0].model, 'gpt-4o');
+  assert.equal(r[0].tokensIn, 1500); assert.equal(r[0].tokensOut, 320); assert.equal(r[0].cost, null); assert.equal(r[0].status, 'waiting');
+});
+
+test('aider: history with no token line has no usage; no history means none found', () => {
+  const root = h.tmp();
+  h.aider(root, 'r', '# aider chat started at 2026-11-26 10:00:00\n\n#### do it\n\nOk.\n', 1000);
+  const r = aider.scan(root); assert.equal(r[0].hasUsage, false); assert.equal(r[0].task, 'do it');
+  assert.deepEqual(aider.scan(h.tmp()), []);
+});
+
+test('cline: task, tokens from api_req_started, followup question means waiting', () => {
+  const root = h.tmp();
+  h.cline(root, '1732600000000', h.clineRows('Make the pricing table responsive', [{ ts: 4, type: 'ask', ask: 'followup', text: JSON.stringify({ question: 'Use CSS grid or flexbox?' }) }]), 60000);
+  const r = cline.scan(root);
+  assert.equal(r.length, 1); assert.equal(r[0].task, 'Make the pricing table responsive'); assert.equal(r[0].tokensIn, 4000); assert.equal(r[0].tokensOut, 500);
+  assert.equal(r[0].model, 'claude-sonnet-4'); assert.equal(r[0].cost, null); assert.equal(r[0].status, 'waiting'); assert.equal(r[0].question, 'Use CSS grid or flexbox?');
+});
+
+test('cline: a finished task is not waiting; bad JSON is skipped', () => {
+  const root = h.tmp();
+  h.cline(root, 't1', h.clineRows('Fix bug', [{ ts: 4, type: 'say', say: 'completion_result', text: 'Fixed.' }, { ts: 5, type: 'ask', ask: 'completion_result', text: '' }]), 3 * 3600000 / 6);
+  h.put(path.join(root, 't2', 'ui_messages.json'), ['{not json'], 1000);
+  const r = cline.scan(root); assert.equal(r.length, 1); assert.equal(r[0].lastSay, 'Fixed.'); assert.notEqual(r[0].status, 'waiting');
 });

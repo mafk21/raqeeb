@@ -43,7 +43,8 @@ module.exports = {
 ```
 
 2. `parse` returns: `id`, `project`, `cwd`, `branch`, `model`, `task`, `lastSay`, `updated` (ms), `tokensIn`, `tokensOut`, `turns`, `cost` and `hasUsage`. Use `cost: null` when you have no price rate. Never guess a price or token count. Leave fields empty (`''`, `0`) when the log does not have them.
-3. You rarely need to write `inspect` and `scan` yourself. Use the helpers in `lib/common.js`: `inspectFiles(root, depth, matchFn, now)`, `makeScanner({ depth, match, parse })` (adds status, caches parses by mtime and size, hides sessions older than 24 hours) and `readJsonl(file)` (skips bad lines).
+   Optional: return `asking: true` from `parse` when the tool itself is waiting on the user (approvals, follow-up questions); the card then shows Waiting without needing a question mark. See `cline.js`.
+3. You rarely need to write `inspect` and `scan` yourself. Use the helpers in `lib/common.js`: `inspectFiles(root, depth, matchFn, now)`, `makeScanner({ depth, match, parse })` (adds status, caches parses by mtime and size, hides sessions older than 24 hours; pass `ttl` to cache the file list for wide roots) and `readJsonl(file)` (skips bad lines).
 4. Register it in `lib/providers/index.js`.
 5. Put a comment at the top of the file with the log location and **links to the sources you based the format on**. If you did not test with a real install, keep `experimental: true`.
 6. Add fixture helpers and tests in `test/` (see `test/helpers.js` and `test/providers.test.js`). Fixtures should be small files that document the format you read. The UI, badges, filter chips, setup panel and spend panels pick the new provider up automatically. Add a colour for its badge in `public/style.css` (`.t-<id>`) if you want one.

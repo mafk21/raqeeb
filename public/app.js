@@ -40,6 +40,7 @@ function provCard(p) {
   const info = p.info, found = info.exists && info.isDir;
   const cls = p.state === 'ok' ? 'good' : p.state === 'no-sessions' ? 'warn' : 'bad';
   const msg = p.state === 'ok' ? `Found ${p.count} active session${p.count === 1 ? '' : 's'} (${info.files} files in all).`
+      : p.state === 'no-sessions' && !info.files ? 'Folder found, but no session files in it yet.'
     : p.state === 'no-sessions' ? `Folder found with ${info.files} older session file${info.files === 1 ? '' : 's'}, none in the last 24 hours.`
     : `No folder at ${mono(p.root)}.`;
   const cands = (p.candidates || []).filter(c => c.exists && c.isDir && c.path !== p.root);
@@ -53,10 +54,10 @@ function provCard(p) {
 }
 
 function onboard(r, setup) {
-  const ps = setup.providers, any = ps.some(p => p.state === 'ok'), found = ps.filter(p => p.info.exists);
+  const ps = setup.providers, any = ps.some(p => p.state === 'ok'), found = ps.filter(p => p.info.exists && p.info.files > 0);
   const headline = any ? 'Setup' : found.length ? 'No agent sessions in the last 24 hours' : 'Raqeeb could not find any agent sessions';
   const detail = any ? 'These are the tools Raqeeb checks and where it looks. Change a folder if yours lives somewhere else.'
-    : found.length ? 'Raqeeb found at least one tool folder, but no session was touched in the last 24 hours.' : 'None of the supported tools has a session folder at the usual place on this computer.';
+    : found.length ? 'Raqeeb found session files for at least one tool, but none was touched in the last 24 hours.' : 'None of the supported tools has a session folder at the usual place on this computer.';
   $('#onboard').innerHTML = `<div class="ob"><div class="ob-head"><span class="ob-tag">${any ? 'Setup' : found.length ? 'Nothing to show yet' : 'First run'}</span><h1>${headline}</h1>
     <p>${detail} ${any ? '' : 'No sample data is shown. '}Everything on this page comes from your own session files, read-only.</p></div>
     <div class="ob-grid3">${ps.map(provCard).join('')}</div>

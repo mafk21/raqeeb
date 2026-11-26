@@ -94,3 +94,7 @@ body{font-family:"Space Grotesk","Inter",sans-serif}
 .st{font:700 11px "Inter";letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:3px;border:1.5px solid var(--ink)}.st.good{background:var(--moss);color:#fff}.st.warn{background:var(--amberbg)}.st.bad{background:var(--clay);color:#fff}
 .prov .cmd{margin:0 0 8px;font-size:12px}.prov p{min-height:40px}.prov input[readonly]{opacity:.7}
 .ob-foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center;margin-top:26px;padding:16px 18px;border:1.5px solid var(--ink);border-radius:6px;background:var(--surf);font-size:14px}
+
+.t-gemini{background:#d3e2ee}.t-aider{background:#efe3b8}.t-cline{background:#e8d2e2}
+[data-theme=dark] .t-gemini{background:#1f3140;color:#efeadc}[data-theme=dark] .t-aider{background:#403819;color:#efeadc}[data-theme=dark] .t-cline{background:#3a2336;color:#efeadc}
+#pseg{flex-wrap:wrap}.bar{flex-wrap:wrap}

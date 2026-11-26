@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+- Three more tools: Gemini CLI, Aider and Cline, each its own adapter, all experimental (written from published format notes, tested with fixture files only).
+- Setup screen has a panel for each; new flags `--gemini-dir`, `--aider-dir`, `--cline-dir`.
+- Adapters can say a tool is asking for input (Cline approvals and follow-up questions show as Waiting).
+- Wide folder searches (Aider) are cached for a minute and skip `node_modules` and hidden tool folders.
+- No price rates for the new tools: tokens only. 21 tests.
+
 ## 0.4.0
 - Multi-agent. Raqeeb now reads Claude Code, Codex CLI and Cursor through provider adapters in `lib/providers/`. Adding another tool is one file, documented in CONTRIBUTING.
 - Codex CLI and Cursor adapters are **experimental**: written from published format notes and tested with fixtures only. Marked beta in the UI and README.

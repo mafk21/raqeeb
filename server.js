@@ -16,8 +16,7 @@ function parseArgs(argv) {
     else if (a === '--version' || a === '-v') o.version = true;
     else if (a === '--port' || a === '-p') o.port = +argv[++i];
     else if (a === '--dir' || a === '--claude-dir') o.dirs.claude = argv[++i] || '';
-    else if (a === '--codex-dir') o.dirs.codex = argv[++i] || '';
-    else if (a === '--cursor-dir') o.dirs.cursor = argv[++i] || '';
+    else if (/^--(codex|cursor|gemini|aider|cline)-dir$/.test(a)) o.dirs[a.slice(2, -4)] = argv[++i] || '';
     else { console.error('Unknown option: ' + a); o.help = true; o.bad = true; }
   }
   return o;

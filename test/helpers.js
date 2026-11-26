@@ -22,7 +22,19 @@ const cursor = (root, slug, id, rows, age) => put(path.join(root, slug, 'agent-t
 const cursorRows = (task, say) => [
   { role: 'user', message: { content: [{ type: 'text', text: '<user_query>\n' + task + '\n</user_query>' }] } },
   { role: 'assistant', message: { content: [{ type: 'text', text: say }] } }];
+const gemini = (root, proj, name, rows, age) => put(path.join(root, proj, 'chats', 'session-' + name + '.jsonl'), rows, age);
+const geminiRows = (task, say) => [
+  { sessionId: 'sess-1', startTime: 't', lastUpdated: 't' },
+  { id: 'm1', timestamp: 't', type: 'user', content: [{ text: task }] },
+  { id: 'm2', timestamp: 't', type: 'gemini', content: say, model: 'gemini-2.5-pro', tokens: { input: 1200, output: 300, cached: 0, thoughts: 50, total: 1550 } }];
+const aider = (root, repo, text, age) => { const f = path.join(root, repo, '.aider.chat.history.md'); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); const t = new Date(Date.now() - age); fs.utimesSync(f, t, t); return f; };
+const aiderText = (task, say) => '\n# aider chat started at 2026-11-20 09:00:00\n\n> Model: gpt-4o with diff edit format\n\n#### old task\n\nold reply\n\n> Tokens: 9k sent, 1k received.\n\n# aider chat started at 2026-11-26 10:00:00\n\n> Aider v0.86.0\n> Model: gpt-4o with diff edit format\n\n#### ' + task + '\n\n' + say + '\n\n> Tokens: 1.5k sent, 320 received.\n';
+const cline = (root, id, rows, age) => put(path.join(root, id, 'ui_messages.json'), [JSON.stringify(rows)], age);
+const clineRows = (task, tail) => [
+  { ts: 1, type: 'say', say: 'task', text: task },
+  { ts: 2, type: 'say', say: 'api_req_started', text: JSON.stringify({ tokensIn: 4000, tokensOut: 500, cacheWrites: 10, cost: 0.02 }), modelInfo: { modelId: 'claude-sonnet-4' } },
+  { ts: 3, type: 'say', say: 'text', text: 'Looking at the files.' }, ...tail];
 function req(port, p, opt = {}) {
   return new Promise((res, rej) => { const r = http.request({ port, path: p, host: '127.0.0.1', agent: false, ...opt }, x => { let b = ''; x.on('data', d => b += d); x.on('end', () => res({ code: x.statusCode, body: b })); }); r.on('error', rej); if (opt.data) r.write(opt.data); r.end(); });
 }
-module.exports = { tmp, put, claude, cUser, cAsst, codex, codexRows, cursor, cursorRows, req };
+module.exports = { tmp, put, claude, cUser, cAsst, codex, codexRows, cursor, cursorRows, gemini, geminiRows, aider, aiderText, cline, clineRows, req };
