@@ -5,6 +5,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const os = require('os');
 const { collect, demo, demoProviders, rootFor, byId } = require('./lib/sessions');
 const config = require('./lib/config');
+const license = require('./lib/license');
 const handoff = require('./lib/handoff'), conflicts = require('./lib/conflicts');
 const prompts = require('./lib/prompts'), hooks = require('./lib/hooks'), crypto = require('crypto');
 const pkg = require('./package.json');
@@ -140,6 +141,17 @@ function createServer(opts) {
         const r = b.action === 'retire' ? handoff.retire(cwd, b.name) : b.action === 'save' ? handoff.save(cwd, b) : { error: 'Unknown action' };
         json(res, r.error ? 400 : 200, r);
       }, 20000);
+    }
+    if (url === '/api/license' && req.method === 'GET') return json(res, 200, license.status());
+    if (url === '/api/license' && req.method === 'POST') {
+      if (!sameOrigin()) return json(res, 403, { error: 'Forbidden' });
+      if (!/application\/json/.test(req.headers['content-type'] || '')) return json(res, 415, { error: 'Send JSON' });
+      return readBody(req, async (e, b) => {
+        if (e) return json(res, 400, { error: 'Bad request' });
+        if (opts.demo) return json(res, 400, { error: 'Demo mode does not activate licences.' });
+        if (b.action === 'remove') return json(res, 200, license.remove());
+        const r = await license.activate(b.key); json(res, r.error ? 400 : 200, r);
+      }, 2000);
     }
     if (url === '/api/health') return json(res, 200, { ok: true, version: pkg.version });
     const pub = path.join(__dirname, 'public');

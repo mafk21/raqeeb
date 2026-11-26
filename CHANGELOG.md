@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.14.0
+- Licence layer with feature flags. Provider-agnostic (Polar and Gumroad adapters), with empty placeholder settings in lib/license-config.js. Nothing is on sale: the License dialog says so, and no Pro feature is built. Tested with mocked provider replies only, never against a real account.
+
 ## 0.13.0
 - MCP server for handoff notes: `raqeeb mcp` (tools handoff_read, handoff_write), Claude Code first. Handoffs page shows the connect command. A real Claude Code 2.1.332 connected to it; a model calling the tools was not tested.
 - 2 new tests (44 total).

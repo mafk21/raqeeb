@@ -226,3 +226,16 @@ let psig = '';
 async function pollPrompts() { if (demoOn) { if (prompts.length) { prompts = []; psig = ''; draw(); } return; } try { const r = await (await fetch('/api/prompts')).json(); const sg = JSON.stringify(r.prompts.map(p => p.id)); prompts = r.prompts; if (sg !== psig) { psig = sg; if (!$('#dash').hidden) { draw(); document.querySelectorAll('[data-pid]').forEach(e => paintSel(e.dataset.pid)); } } } catch {} }
 setInterval(pollPrompts, 1500); pollPrompts();
 refresh().catch(() => {}); setInterval(() => { if (!document.activeElement || document.activeElement.tagName !== 'INPUT') refresh().catch(() => {}); if (view === 'hand') loadHand(); }, 5000);
+
+// License dialog. Pro is not on sale, so this shows the plain state and the list of planned features.
+$('#licbtn').onclick = async () => {
+  const d = $('#licdlg'), s = await (await fetch('/api/license')).json();
+  const msg = { not_on_sale: 'Raqeeb Pro is not on sale yet. Everything marked Free below works without a key.', none: 'No licence key entered.', active: 'Pro is active.', grace: 'Pro is active. The licence server could not be reached, so Raqeeb is using the last good check.', ended: 'This subscription has ended. Your notes and settings are untouched.', offline_expired: 'Raqeeb has not been able to check your key for too long, so Pro is off until it can.', invalid: 'That key was not recognised.', device_limit: 'This key is used on the maximum number of devices.' }[s.state] || s.state;
+  const rows = s.features.map(f => `<li><b>${esc(f.id.replace(/_/g, ' '))}</b> <span class="tag">${f.tier === 'free' ? 'Free' : 'Pro'}</span> <small>${f.built ? (f.enabled ? 'on' : 'off, needs Pro') : 'not built yet'}</small></li>`).join('');
+  const form = s.onSale ? (s.key ? `<p>Key ${esc(s.key)}${s.endsAt ? ' · until ' + esc(s.endsAt.slice(0, 10)) : ''}</p><button class="btn sm" id="licrm">Remove key</button>` : `<input id="lickey" placeholder="Paste your licence key" autocomplete="off" spellcheck="false"><button class="btn sm" id="licgo">Activate</button>`) : '';
+  d.innerHTML = `<h2>Licence</h2><p id="licmsg">${esc(msg)}</p>${form}<ul class="lic">${rows}</ul><p><small>Raqeeb runs on your machine, so this check is a convenience, not a lock. The source is under a noncommercial licence.</small></p><button class="btn sm" id="licx">Close</button>`;
+  $('#licx').onclick = () => d.close();
+  if ($('#licgo')) $('#licgo').onclick = async () => { const r = await fetch('/api/license', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#lickey').value }) }); const j = await r.json(); if (j.error) $('#licmsg').textContent = j.error; else $('#licbtn').click(); };
+  if ($('#licrm')) $('#licrm').onclick = async () => { await fetch('/api/license', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove' }) }); $('#licbtn').click(); };
+  d.open ? 0 : d.showModal();
+};

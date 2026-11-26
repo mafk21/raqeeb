@@ -153,3 +153,5 @@ body{font-family:"Space Grotesk","Inter",sans-serif}
 
 .snip{border:1.5px dashed var(--ink);border-radius:6px;padding:10px 12px;margin-bottom:6px}.snip summary{cursor:pointer;font-weight:600;font-size:14px}.snip p{font-size:13px;color:var(--ink2);margin:8px 0}.snip pre.cmd{max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap}
 .clash{font:700 11px "Inter";background:var(--amber);color:#fff;padding:1px 7px;border-radius:3px;white-space:nowrap}
+
+#licdlg{border:1.5px solid var(--ink);border-radius:6px;background:var(--surf);color:var(--ink);max-width:460px;box-shadow:4px 4px 0 var(--ink)}#licdlg::backdrop{background:rgba(21,23,26,.4)}#licdlg h2{margin:0 0 8px}ul.lic{list-style:none;padding:0;margin:12px 0}ul.lic li{padding:4px 0;border-bottom:1px solid var(--line2);font-size:14px}ul.lic .tag{font-size:11px;border:1px solid var(--ink);border-radius:4px;padding:0 5px;margin:0 6px}#licdlg input{width:100%;padding:8px;margin:8px 0;border:1.5px solid var(--ink);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
