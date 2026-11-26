@@ -158,7 +158,7 @@ Raqeeb reads the session logs (`.jsonl` files) each tool writes, read-only, and 
 
 Sessions untouched for 24 hours are hidden.
 
-## Handoffs (new in 0.9.0, drafts in 0.10.0)
+## Handoffs (new in 0.9.0)
 
 The **Handoffs** button opens a notebook for each project. Write a note when you finish something (what was done, decided and still open), and press **Copy as prompt** to paste a clean context block into any agent that cannot read the board. Notes are plain Markdown files in `<your repo>/.raqeeb/handoff/`, so they travel with the project and you can commit, edit or delete them yourself.
 
@@ -169,7 +169,8 @@ The **Handoffs** button opens a notebook for each project. Write a note when you
 - Pinned notes sit at the top of a project ("we use pnpm").
 - A project shows up once Raqeeb has seen an agent session in that folder in the last 24 hours.
 - **Save handoff** in an agent's detail panel drafts a note from its last message and the files git shows as changed. It opens in the form for you to edit, and nothing is saved until you press Save note.
-- Not built yet: a snippet for your rule file, and an MCP server so agents can read and write notes themselves.
+- Below the notes list, **Let agents read and write these notes** shows a block to paste into `CLAUDE.md`, `AGENTS.md` or your tool's rules. Raqeeb only shows it. A note an agent writes this way is checked for keys when Raqeeb reads it, and hidden if it looks like it holds one.
+- Not built yet: an MCP server so agents can read and write notes themselves.
 - Tested with automated tests and a headless browser run. Not tested with real agents reading the notes yet.
 
 ## Honest limitations

@@ -183,7 +183,7 @@ async function loadHand() {
 function noteCard(p, n) {
   const st = n.stale && n.stale.stale;
   return `<div class="note-card ${st ? 'old' : ''}"><div class="need-h">${tbadge(n.tool)}<b>${esc(n.title)}</b><span class="sp"></span><span class="age">${esc(stamp(n.created))}</span></div>
-  <div class="nmeta">${n.branch ? `<code>${esc(n.branch)}</code>` : ''}${n.commit ? `<code>${esc(n.commit)}</code>` : ''}${st ? `<span class="stale" title="${esc(n.stale.why)}">older than the code</span>` : ''}${n.stale && n.stale.checked && !st ? '<span class="fresh">matches the code</span>' : ''}${n.demo ? '<span class="demo-tag">DEMO</span>' : ''}</div>
+  <div class="nmeta">${n.branch ? `<code>${esc(n.branch)}</code>` : ''}${n.commit ? `<code>${esc(n.commit)}</code>` : ''}${st ? `<span class="stale" title="${esc(n.stale.why)}">older than the code</span>` : ''}${n.stale && n.stale.checked && !st ? '<span class="fresh">matches the code</span>' : ''}${n.secret ? '<span class="stale">may contain a secret</span>' : ''}${n.demo ? '<span class="demo-tag">DEMO</span>' : ''}</div>
   <pre class="nbody">${esc(n.body)}</pre>${n.files.length ? `<div class="nfiles">${n.files.map(f => `<code>${esc(f)}</code>`).join('')}</div>` : ''}
   ${st ? `<div class="need-t">${esc(n.stale.why)} Check it before relying on it.</div>` : ''}
   <div class="need-a"><button class="btn sm pri" data-copy="${esc(n.name)}">Copy as prompt</button>${n.demo ? '' : `<button class="btn sm ghost" data-retire="${esc(n.name)}">Retire</button>`}</div></div>`;
@@ -199,7 +199,8 @@ function drawHand() {
   ${p.pinned.length ? `<div class="k">Pinned for this project</div>${p.pinned.map(n => `<div class="pinned"><b>${esc(n.title)}</b> ${esc(n.body)}${hand.demo ? '' : `<button class="link" data-retire="${esc(n.name)}">remove</button>`}</div>`).join('')}` : ''}
   <div class="hcols"><div><div class="k">Timeline, newest first</div>${p.notes.length ? p.notes.map(n => noteCard(p, n)).join('') : '<div class="empty">No notes yet for this project. Write the first one on the right, or ask an agent to leave one.</div>'}
   ${p.notes.length || p.pinned.length ? `<div class="need-a"><button class="btn sm" data-copyproj="1">Copy project context</button><span class="need-t">Pinned notes plus the newest ${Math.min(5, p.notes.length)}, as one block to paste into any tool.</span></div>` : ''}${p.retired ? `<div class="need-t">${p.retired} retired note${p.retired === 1 ? '' : 's'} are kept in <code>retired/</code>.</div>` : ''}</div>
-  <div><div class="k">Write a note</div>${handNotice ? `<div class="need-t draftnote"><b>Draft from ${esc(toolName[handForm.tool] || 'the agent')}.</b> Edit it, then save. ${esc(handNotice)}</div>` : ''}<form id="hform" class="hform"><label>Title<input id="hf-title" maxlength="120" value="${esc(handForm.title)}" placeholder="Webhook handler is idempotent now"></label>
+  <div><details class="snip"><summary>Let agents read and write these notes</summary><p>Paste this into your project's <code>CLAUDE.md</code>, <code>AGENTS.md</code> or the rules your tool uses. Raqeeb shows it but never edits your files.</p><pre class="cmd">${esc(p.snippet)}</pre><button class="btn sm" data-snip="1">Copy snippet</button></details>
+  <div class="k">Write a note</div>${handNotice ? `<div class="need-t draftnote"><b>Draft from ${esc(toolName[handForm.tool] || 'the agent')}.</b> Edit it, then save. ${esc(handNotice)}</div>` : ''}<form id="hform" class="hform"><label>Title<input id="hf-title" maxlength="120" value="${esc(handForm.title)}" placeholder="Webhook handler is idempotent now"></label>
   <label>What was done, decided, still open<textarea id="hf-body" rows="7" placeholder="Done: ...&#10;Decided: ...&#10;Open: ...">${esc(handForm.body)}</textarea></label>
   <label>Files (optional, one per line or comma separated)<textarea id="hf-files" rows="2" placeholder="src/webhooks.ts">${esc(handForm.files)}</textarea></label>
   <label class="chk"><input type="checkbox" id="hf-pin" ${handForm.kind === 'pinned' ? 'checked' : ''}> Pin to the top of this project (for things like "we use pnpm")</label>
@@ -208,6 +209,7 @@ function drawHand() {
   const sel = $('#hproj'); if (sel) sel.onchange = () => { handProj = sel.value; handErr = ''; drawHand(); };
   const find = n => p.notes.find(x => x.name === n);
   el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(find(b.dataset.copy).prompt, b, 'Copy as prompt'));
+  el.querySelectorAll('[data-snip]').forEach(b => b.onclick = () => copyText(p.snippet, b, 'Copy snippet'));
   el.querySelectorAll('[data-copyproj]').forEach(b => b.onclick = () => copyText(p.projectPrompt, b, 'Copy project context'));
   el.querySelectorAll('[data-retire]').forEach(b => b.onclick = async () => { const x = await post('/api/handoff', { action: 'retire', cwd: p.cwd, name: b.dataset.retire }); handErr = x.ok ? '' : x.body.error; hand = null; loadHand(); });
   $('#hform').onsubmit = async e => { e.preventDefault(); if (handBusy) return; handBusy = true;

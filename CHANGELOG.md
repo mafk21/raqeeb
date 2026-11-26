@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+- Rule-file snippet on the Handoffs page (shown and copyable, never written to your files). Notes that agents write by hand are scanned for keys when read, and hidden with a warning if one is found.
+- 1 new test (40 total).
+
 ## 0.10.0
 - Save handoff: a button in an agent's detail panel drafts a note from the agent's last message, the task, and the uncommitted files git shows. You edit it and press Save note. A last message that looks like it holds a key is left out of the draft. Fixed in the same change: a leading-space bug that cut the first letter off drafted file paths (caught by a test).
 - 2 new tests (39 total).

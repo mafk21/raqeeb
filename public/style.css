@@ -150,3 +150,5 @@ body{font-family:"Space Grotesk","Inter",sans-serif}
 @media(max-width:860px){.hcols{grid-template-columns:1fr}}
 .t-you{background:var(--bg2)}
 .draftnote{background:var(--amberbg);border:1.5px solid var(--ink);border-radius:6px;padding:8px 10px;margin-bottom:8px;color:var(--ink)}
+
+.snip{border:1.5px dashed var(--ink);border-radius:6px;padding:10px 12px;margin-bottom:6px}.snip summary{cursor:pointer;font-weight:600;font-size:14px}.snip p{font-size:13px;color:var(--ink2);margin:8px 0}.snip pre.cmd{max-height:240px;overflow:auto;font-size:12px;white-space:pre-wrap}

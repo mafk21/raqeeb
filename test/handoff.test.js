@@ -112,3 +112,15 @@ test('API draft: by agent id, 404 for unknown ids and for demo', async () => {
   assert.equal((await h.req(port, '/api/handoff/draft?id=x&demo=1')).code, 400);
   srv.closeAllConnections(); srv.close();
 });
+
+test('rule-file snippet: its own example header parses, and agent-written notes with secrets are hidden', () => {
+  const d = repo(), dir = path.join(d, '.raqeeb', 'handoff'); fs.mkdirSync(dir, { recursive: true });
+  const m = handoff.SNIPPET.match(/\n---\n[\s\S]*?\n---\n\n[\s\S]*?\n\nUse your own/); assert.ok(m);
+  const note = m[0].replace(/\n\nUse your own$/, '').trim() + '\n';
+  const p = handoff.parse(note, 'x.md'); assert.equal(p.title, 'Short title'); assert.equal(p.tool, 'claude'); assert.equal(p.commit, 'abc1234'); assert.deepEqual(p.files, ['path/you/changed.js']); assert.match(p.body, /^Done:/);
+  fs.writeFileSync(path.join(dir, '20260101-000000-claude-ok.md'), note);
+  fs.writeFileSync(path.join(dir, '20260102-000000-codex-bad.md'), note.replace('Short title', 'Leaky').replace('what you did', 'my token is ghp_' + 'a'.repeat(36)));
+  const l = handoff.list(d); assert.equal(l.notes.length, 2); const bad = l.notes.find(n => n.title === 'Leaky');
+  assert.equal(bad.secret, true); assert.ok(!/ghp_/.test(bad.body + bad.prompt + l.projectPrompt)); assert.ok(!l.notes.find(n => n.title === 'Short title').secret);
+  assert.match(handoff.SNIPPET, /Never put keys/); assert.ok(!/\.\.\//.test(handoff.SNIPPET));
+});
