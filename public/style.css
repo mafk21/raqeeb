@@ -132,3 +132,20 @@ body{font-family:"Space Grotesk","Inter",sans-serif}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 .ans{font-size:13px;padding:8px 10px;border:1.5px dashed var(--ink);border-radius:6px;margin-bottom:6px}.ans.yes{border-style:solid;background:var(--amberbg)}.ans.no{color:var(--mute)}
 .need-n .link{font:inherit}
+
+/* Handoffs */
+#handbtn.on{background:var(--ink);color:var(--bg)}
+#hand{margin-top:6px}.hlead{margin:0 0 14px;color:var(--ink2);font-size:14px}.hlead code,.nmeta code,.nfiles code{font:12px "JetBrains Mono",monospace}
+#hand .k{font:600 11px "Inter";text-transform:uppercase;letter-spacing:.1em;color:var(--mute);margin:16px 0 8px}
+.hcols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:26px;align-items:start}
+.note-card{background:var(--surf);border:1.5px solid var(--ink);border-radius:6px;padding:14px 16px;margin-bottom:12px}.note-card.old{border-left:6px solid var(--amber)}
+.nmeta,.nfiles{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}.nmeta code,.nfiles code{background:var(--bg2);border:1px solid var(--line2);border-radius:3px;padding:0 6px}
+.nbody{white-space:pre-wrap;font:14px/1.55 "Inter",sans-serif;margin:8px 0;color:var(--ink)}
+.stale{font:700 11px "Inter";background:var(--amber);color:#fff;padding:1px 7px;border-radius:3px}.fresh{font:600 11px "Inter";color:var(--mute)}
+.demo-tag{font:700 11px "Inter";background:var(--ink);color:var(--bg);padding:1px 7px;border-radius:3px;letter-spacing:.08em}
+.pinned{border:1.5px dashed var(--ink);border-radius:6px;padding:9px 12px;margin-bottom:8px;font-size:14px}.pinned .link{margin-left:10px;font-size:12px}
+.hform{display:flex;flex-direction:column;gap:10px;background:var(--surf);border:1.5px solid var(--ink);border-radius:6px;padding:14px}.hform label{display:flex;flex-direction:column;gap:4px;font:600 12px "Inter";color:var(--ink2)}
+.hform input[type=text],.hform input:not([type]),.hform textarea,#hproj{font:14px "Inter",sans-serif;padding:8px 10px;border:1.5px solid var(--ink);border-radius:6px;background:var(--bg);color:var(--ink)}
+.hform label.chk{flex-direction:row;align-items:center;gap:8px;font-weight:500}
+@media(max-width:860px){.hcols{grid-template-columns:1fr}}
+.t-you{background:var(--bg2)}

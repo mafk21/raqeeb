@@ -5,6 +5,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const os = require('os');
 const { collect, demo, demoProviders, rootFor, byId } = require('./lib/sessions');
 const config = require('./lib/config');
+const handoff = require('./lib/handoff');
 const prompts = require('./lib/prompts'), hooks = require('./lib/hooks'), crypto = require('crypto');
 const pkg = require('./package.json');
 
@@ -111,6 +112,25 @@ function createServer(opts) {
         if (!d) return json(res, 400, { error: 'That answer does not match the question.' });
         item.done(d.none ? null : d); json(res, 200, { ok: true });
       });
+    }
+    // Handoff notes. Projects are the working folders of agent sessions Raqeeb has seen, so a request cannot point at any other folder.
+    const projectDirs = () => { const seen = new Set(); collect(opts, config.load()).agents.forEach(a => { if (a.cwd && path.isAbsolute(a.cwd)) { try { if (fs.statSync(a.cwd).isDirectory()) seen.add(fs.realpathSync(a.cwd)); } catch {} } }); return [...seen]; };
+    if (url === '/api/handoff' && req.method === 'GET') {
+      if (opts.demo || q.get('demo') === '1') return json(res, 200, { demo: true, projects: [handoff.demo()] });
+      const byRoot = new Map(); projectDirs().forEach(d => { const l = handoff.list(d); const k = l.root; if (!byRoot.has(k) || byRoot.get(k).cwd.length > d.length) byRoot.set(k, l); });
+      return json(res, 200, { demo: false, projects: [...byRoot.values()].sort((a, b) => (b.notes.length + b.pinned.length) - (a.notes.length + a.pinned.length) || (a.project < b.project ? -1 : 1)) });
+    }
+    if (url === '/api/handoff' && req.method === 'POST') {
+      if (!sameOrigin()) return json(res, 403, { error: 'Forbidden' });
+      if (!/application\/json/.test(req.headers['content-type'] || '')) return json(res, 415, { error: 'Send JSON' });
+      return readBody(req, (e, b) => {
+        if (e) return json(res, 400, { error: 'Bad request' });
+        if (opts.demo) return json(res, 400, { error: 'Demo mode does not save notes.' });
+        let cwd = ''; try { cwd = fs.realpathSync(String(b.cwd || '')); } catch {}
+        if (!cwd || !projectDirs().includes(cwd)) return json(res, 400, { error: 'Raqeeb only saves notes for projects it has seen an agent session in.' });
+        const r = b.action === 'retire' ? handoff.retire(cwd, b.name) : b.action === 'save' ? handoff.save(cwd, b) : { error: 'Unknown action' };
+        json(res, r.error ? 400 : 200, r);
+      }, 20000);
     }
     if (url === '/api/health') return json(res, 200, { ok: true, version: pkg.version });
     const pub = path.join(__dirname, 'public');

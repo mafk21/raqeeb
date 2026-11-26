@@ -158,6 +158,19 @@ Raqeeb reads the session logs (`.jsonl` files) each tool writes, read-only, and 
 
 Sessions untouched for 24 hours are hidden.
 
+## Handoffs (new in 0.9.0)
+
+The **Handoffs** button opens a notebook for each project. Write a note when you finish something (what was done, decided and still open), and press **Copy as prompt** to paste a clean context block into any agent that cannot read the board. Notes are plain Markdown files in `<your repo>/.raqeeb/handoff/`, so they travel with the project and you can commit, edit or delete them yourself.
+
+- Raqeeb writes only in that folder, only when you press Save, and never edits any other file in your project (no `CLAUDE.md` or `AGENTS.md` changes).
+- Each note records the branch and commit. A note is marked **older than the code** when a file it lists has changed since.
+- Notes are capped at 2 KB, and a pattern check refuses saves that look like keys or passwords. It can miss some, so do not put secrets in notes.
+- The prompt tells the agent to treat notes as background, not as instructions.
+- Pinned notes sit at the top of a project ("we use pnpm").
+- A project shows up once Raqeeb has seen an agent session in that folder in the last 24 hours.
+- Not built yet: drafting a note from a finished session, a snippet for your rule file, and an MCP server so agents can read and write notes themselves.
+- Tested with automated tests and a headless browser run. Not tested with real agents reading the notes yet.
+
 ## Honest limitations
 
 - **Three tools for now.** Claude Code, Codex CLI, Cursor, Gemini CLI, Aider and Cline. Copilot agent mode, Windsurf, OpenCode, Amp and others are not read yet. Everything except Claude Code is experimental (see above).

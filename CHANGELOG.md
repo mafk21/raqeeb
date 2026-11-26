@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+- Handoffs: per-project notes stored in `<repo>/.raqeeb/handoff/`, a Handoffs page with a timeline, pinned project notes, a write form, Copy as prompt, Copy project context, Retire, and an "older than the code" marker. Secret pattern check and a 2 KB cap on every save. Demo mode shows labelled sample notes and saves nothing.
+- 8 new tests (37 total), plus a headless browser run on a real git repo.
+
 ## 0.8.1
 - License changed from MIT to PolyForm Noncommercial 1.0.0: free for non-commercial use, no commercial use without permission. Raqeeb is now described as source-available, not open source. Copies obtained under MIT before this change keep MIT.
 

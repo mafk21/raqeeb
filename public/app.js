@@ -149,10 +149,11 @@ async function refresh(force) {
   const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay]), JSON.stringify(r.hooks || {})]);
   if (!force && sig === last) return; last = sig;
   agents = r.agents; providers = r.providers; hooksInfo = r.hooks || {};
-  $('#onboard').hidden = !needSetup; $('#dash').hidden = needSetup;
+  $('#onboard').hidden = !needSetup; $('#dash').hidden = needSetup || view === 'hand'; $('#hand').hidden = needSetup || view !== 'hand'; $('#handbtn').classList.toggle('on', view === 'hand' && !needSetup);
   $('#banner').innerHTML = r.demo ? `<div class="banner demo"><b>DEMO</b> These are made-up sample agents, not your sessions. ${r.forced ? '' : '<button class="btn sm" id="exitdemo">Exit demo</button>'}</div>` : '';
   if ($('#exitdemo')) $('#exitdemo').onclick = () => { demoOn = false; sessionStorage.demo = '0'; last = ''; refresh(true); };
   if (needSetup) return onboard(r, setupData);
+  if (view === 'hand') loadHand();
   if (pfilter !== 'all' && !providers.some(p => p.id === pfilter)) pfilter = 'all';
   drawProviderFilter(); draw(); animate = false;
   $('#provs').innerHTML = providers.map(p => `<div class="sp-row prow"><span>${badge(p)}</span><small class="${p.state === 'ok' || p.state === 'demo' ? '' : 'dim'}">${esc(provLine(p))}</small></div>`).join('') + (r.demo ? '' : '<div class="note">Not seeing a tool? Press <b>Setup</b> to check its folder.</div>');
@@ -161,7 +162,55 @@ async function refresh(force) {
   $('#spendp').innerHTML = providers.map(p => { const v = sum(a => a.provider, agents)[p.id]; return v ? row(p.name, v) : ''; }).join('') || '<div class="empty">No spend yet.</div>';
   $('#spend').innerHTML = Object.entries(sum(a => a.project, agents)).sort((a, b) => b[1].cost - a[1].cost).map(([n, v]) => row(n, v)).join('') || '<div class="empty">No spend yet.</div>';
 }
+// ---- Handoffs: notes that agents and you leave for the next session, stored inside each project ----
+let view = 'board', hand = null, handProj = '', handErr = '', handForm = { title: '', body: '', files: '', kind: 'note' }, handBusy = false;
+const toolName = { you: 'You', claude: 'Claude Code', codex: 'Codex CLI', cursor: 'Cursor', gemini: 'Gemini CLI', aider: 'Aider', cline: 'Cline' };
+const stamp = ms => ms ? new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'unknown time';
+const tbadge = t => t === 'you' ? '<span class="tag t-you">You</span>' : badge({ id: t, name: toolName[t] });
+$('#handbtn').onclick = () => { view = view === 'hand' ? 'board' : 'hand'; showSetup = false; last = ''; if (view === 'hand') { hand = null; handErr = ''; } refresh(true); };
+async function loadHand() {
+  try { const r = await (await fetch('/api/handoff' + (demoOn ? '?demo=1' : ''))).json(); const sg = JSON.stringify(r); if (hand && hand._sg === sg) return; r._sg = sg; hand = r; } catch { return; }
+  if (!hand.projects.some(p => p.root === handProj)) handProj = hand.projects.length ? hand.projects[0].root : '';
+  if (!document.activeElement || !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) drawHand();
+}
+function noteCard(p, n) {
+  const st = n.stale && n.stale.stale;
+  return `<div class="note-card ${st ? 'old' : ''}"><div class="need-h">${tbadge(n.tool)}<b>${esc(n.title)}</b><span class="sp"></span><span class="age">${esc(stamp(n.created))}</span></div>
+  <div class="nmeta">${n.branch ? `<code>${esc(n.branch)}</code>` : ''}${n.commit ? `<code>${esc(n.commit)}</code>` : ''}${st ? `<span class="stale" title="${esc(n.stale.why)}">older than the code</span>` : ''}${n.stale && n.stale.checked && !st ? '<span class="fresh">matches the code</span>' : ''}${n.demo ? '<span class="demo-tag">DEMO</span>' : ''}</div>
+  <pre class="nbody">${esc(n.body)}</pre>${n.files.length ? `<div class="nfiles">${n.files.map(f => `<code>${esc(f)}</code>`).join('')}</div>` : ''}
+  ${st ? `<div class="need-t">${esc(n.stale.why)} Check it before relying on it.</div>` : ''}
+  <div class="need-a"><button class="btn sm pri" data-copy="${esc(n.name)}">Copy as prompt</button>${n.demo ? '' : `<button class="btn sm ghost" data-retire="${esc(n.name)}">Retire</button>`}</div></div>`;
+}
+function drawHand() {
+  const el = $('#hand'); if (!hand) { el.innerHTML = '<div class="empty">Loading notes...</div>'; return; }
+  if (!hand.projects.length) { el.innerHTML = `<div class="ob"><div class="ob-head"><span class="ob-tag">Handoffs</span><h1>No projects yet</h1><p>Handoff notes belong to a project. Raqeeb lists a project once it has seen an agent session working in that folder in the last 24 hours. Start a session in one of your tools and this page fills in.</p></div></div>`; return; }
+  const p = hand.projects.find(x => x.root === handProj) || hand.projects[0];
+  const keep = { t: ($('#hf-title') || {}).value, b: ($('#hf-body') || {}).value, f: ($('#hf-files') || {}).value };
+  if (keep.t != null) handForm = { ...handForm, title: keep.t, body: keep.b, files: keep.f };
+  el.innerHTML = `<div class="sec-h"><h2>Handoffs</h2><span class="sp"></span>${hand.projects.length > 1 ? `<select id="hproj" aria-label="Project">${hand.projects.map(x => `<option value="${esc(x.root)}" ${x.root === p.root ? 'selected' : ''}>${esc(x.project)} (${x.notes.length + x.pinned.length})</option>`).join('')}</select>` : ''}</div>
+  <p class="hlead">${hand.demo ? '<span class="demo-tag">DEMO</span> Made-up sample notes. ' : ''}Notes for <b>${esc(p.project)}</b> live in <code>${esc(p.folder)}</code>${p.isGit ? '' : ' (this folder is not a git repo, so notes carry no commit)'}. Plain Markdown files. Commit them or add the folder to <code>.gitignore</code>, as you like.</p>
+  ${p.pinned.length ? `<div class="k">Pinned for this project</div>${p.pinned.map(n => `<div class="pinned"><b>${esc(n.title)}</b> ${esc(n.body)}${hand.demo ? '' : `<button class="link" data-retire="${esc(n.name)}">remove</button>`}</div>`).join('')}` : ''}
+  <div class="hcols"><div><div class="k">Timeline, newest first</div>${p.notes.length ? p.notes.map(n => noteCard(p, n)).join('') : '<div class="empty">No notes yet for this project. Write the first one on the right, or ask an agent to leave one.</div>'}
+  ${p.notes.length || p.pinned.length ? `<div class="need-a"><button class="btn sm" data-copyproj="1">Copy project context</button><span class="need-t">Pinned notes plus the newest ${Math.min(5, p.notes.length)}, as one block to paste into any tool.</span></div>` : ''}${p.retired ? `<div class="need-t">${p.retired} retired note${p.retired === 1 ? '' : 's'} are kept in <code>retired/</code>.</div>` : ''}</div>
+  <div><div class="k">Write a note</div><form id="hform" class="hform"><label>Title<input id="hf-title" maxlength="120" value="${esc(handForm.title)}" placeholder="Webhook handler is idempotent now"></label>
+  <label>What was done, decided, still open<textarea id="hf-body" rows="7" placeholder="Done: ...&#10;Decided: ...&#10;Open: ...">${esc(handForm.body)}</textarea></label>
+  <label>Files (optional, one per line or comma separated)<textarea id="hf-files" rows="2" placeholder="src/webhooks.ts">${esc(handForm.files)}</textarea></label>
+  <label class="chk"><input type="checkbox" id="hf-pin" ${handForm.kind === 'pinned' ? 'checked' : ''}> Pin to the top of this project (for things like "we use pnpm")</label>
+  <div class="need-a"><button class="btn sm pri" type="submit" ${hand.demo ? 'disabled' : ''}>Save note</button><span class="ob-msg" id="hmsg">${esc(handErr)}</span></div>
+  <div class="need-t">Short notes, up to 2 KB. Raqeeb blocks anything that looks like a key or password. Notes are not instructions: they are handed to agents as background only.</div></form></div></div>`;
+  const sel = $('#hproj'); if (sel) sel.onchange = () => { handProj = sel.value; handErr = ''; drawHand(); };
+  const find = n => p.notes.find(x => x.name === n);
+  el.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(find(b.dataset.copy).prompt, b, 'Copy as prompt'));
+  el.querySelectorAll('[data-copyproj]').forEach(b => b.onclick = () => copyText(p.projectPrompt, b, 'Copy project context'));
+  el.querySelectorAll('[data-retire]').forEach(b => b.onclick = async () => { const x = await post('/api/handoff', { action: 'retire', cwd: p.cwd, name: b.dataset.retire }); handErr = x.ok ? '' : x.body.error; hand = null; loadHand(); });
+  $('#hform').onsubmit = async e => { e.preventDefault(); if (handBusy) return; handBusy = true;
+    const body = { action: 'save', cwd: p.cwd, tool: 'you', kind: $('#hf-pin').checked ? 'pinned' : 'note', title: $('#hf-title').value, body: $('#hf-body').value, files: $('#hf-files').value };
+    const x = await post('/api/handoff', body); handBusy = false;
+    if (x.ok) { handForm = { title: '', body: '', files: '', kind: 'note' }; handErr = ''; ['#hf-title', '#hf-body', '#hf-files'].forEach(k => { $(k).value = ''; }); $('#hf-pin').checked = false; } else { handForm = { title: body.title, body: body.body, files: body.files, kind: body.kind }; handErr = x.body.error; }
+    hand = null; await loadHand(); drawHand(); };
+}
+function copyText(t, btn, label) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { btn.textContent = 'Copied'; }, () => { prompt('Copy this text', t); }); setTimeout(() => { btn.textContent = label; }, 1800); }
 let psig = '';
 async function pollPrompts() { if (demoOn) { if (prompts.length) { prompts = []; psig = ''; draw(); } return; } try { const r = await (await fetch('/api/prompts')).json(); const sg = JSON.stringify(r.prompts.map(p => p.id)); prompts = r.prompts; if (sg !== psig) { psig = sg; if (!$('#dash').hidden) { draw(); document.querySelectorAll('[data-pid]').forEach(e => paintSel(e.dataset.pid)); } } } catch {} }
 setInterval(pollPrompts, 1500); pollPrompts();
-refresh().catch(() => {}); setInterval(() => { if (!document.activeElement || document.activeElement.tagName !== 'INPUT') refresh().catch(() => {}); }, 5000);
+refresh().catch(() => {}); setInterval(() => { if (!document.activeElement || document.activeElement.tagName !== 'INPUT') refresh().catch(() => {}); if (view === 'hand') loadHand(); }, 5000);
