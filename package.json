@@ -1,6 +1,6 @@
 {
   "name": "raqeeb",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A local control room for the AI coding agents you run. See every Claude Code session, what it is working on, what it is asking you, and what it costs.",
   "bin": { "raqeeb": "server.js" },
   "main": "server.js",

@@ -74,8 +74,46 @@ test('server: serves the page, agents API, health, and blocks path traversal', a
   assert.notEqual((await get('/..%2fpackage.json')).code, 200);
   assert.equal((await get('/../package.json')).code === 200, false);
   srv.close();
-  const empty = createServer({ dir: path.join(root, 'nope'), demo: false }); await new Promise(r => empty.listen(0, '127.0.0.1', r));
-  const p2 = empty.address().port;
-  const body = await new Promise(res => http.get({ port: p2, path: '/api/agents', host: '127.0.0.1' }, r => { let b = ''; r.on('data', d => b += d); r.on('end', () => res(JSON.parse(b))); }));
-  assert.equal(body.demo, true); assert.equal(body.found, false); empty.close();
+});
+
+test('no sessions: never returns sample data, reports why', async () => {
+  const get = (port, p, opt = {}) => new Promise((res, rej) => { const r = http.request({ port, path: p, host: '127.0.0.1', ...opt }, x => { let b = ''; x.on('data', d => b += d); x.on('end', () => res({ code: x.statusCode, body: b })); }); r.on('error', rej); if (opt.data) r.write(opt.data); r.end(); });
+  process.env.RAQEEB_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'raqeeb-home-'));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'raqeeb-'));
+  // 1. folder missing
+  let srv = createServer({ dir: path.join(base, 'nope'), demo: false }); await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  let body = JSON.parse((await get(srv.address().port, '/api/agents')).body);
+  assert.equal(body.state, 'no-folder'); assert.equal(body.demo, false); assert.deepEqual(body.agents, []); srv.close();
+  // 2. folder exists, only an old session
+  writeSession(base, 'p', 'old', [user('x'), asst('y')], 3 * 24 * 3600000);
+  srv = createServer({ dir: base, demo: false }); await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  body = JSON.parse((await get(srv.address().port, '/api/agents')).body);
+  assert.equal(body.state, 'no-sessions'); assert.equal(body.info.files, 1); assert.equal(body.info.recent, 0); assert.deepEqual(body.agents, []);
+  // 3. demo only on request
+  body = JSON.parse((await get(srv.address().port, '/api/agents?demo=1')).body);
+  assert.equal(body.demo, true); assert.ok(body.agents.length > 0); srv.close();
+});
+
+test('setup API: save a folder, reject bad input, same-origin only, localhost host only', async () => {
+  const get = (port, p, opt = {}) => new Promise((res, rej) => { const r = http.request({ port, path: p, host: '127.0.0.1', ...opt }, x => { let b = ''; x.on('data', d => b += d); x.on('end', () => res({ code: x.statusCode, body: b })); }); r.on('error', rej); if (opt.data) r.write(opt.data); r.end(); });
+  process.env.RAQEEB_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'raqeeb-home-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'raqeeb-'));
+  writeSession(root, 'p', 's', [user('Task'), asst('Working on it.')], 1000);
+  const srv = createServer({ demo: false }); await new Promise(r => srv.listen(0, '127.0.0.1', r)); const port = srv.address().port;
+  const post = (data, headers = {}) => get(port, '/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, data: JSON.stringify(data) });
+  assert.equal((await post({ dir: '/definitely/not/here' })).code, 400);
+  assert.equal((await post({ dir: 'relative/path' })).code, 400);
+  assert.equal((await post({ dir: root }, { Origin: 'http://evil.example' })).code, 403);
+  assert.equal((await get(port, '/api/setup', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, data: '{}' })).code, 415);
+  assert.equal((await get(port, '/api/agents', { headers: { Host: 'evil.example' } })).code, 403);
+  const ok = await post({ dir: root }, { Origin: 'http://localhost:' + port });
+  assert.equal(ok.code, 200);
+  const agents = JSON.parse((await get(port, '/api/agents')).body);
+  assert.equal(agents.state, 'ok'); assert.equal(agents.agents.length, 1);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(process.env.RAQEEB_HOME, 'config.json'), 'utf8')).dir, root); // remembered
+  srv.close();
+  // --dir locks the folder
+  const locked = createServer({ dir: root, demo: false }); await new Promise(r => locked.listen(0, '127.0.0.1', r));
+  assert.equal((await get(locked.address().port, '/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, data: JSON.stringify({ dir: root }) })).code, 409);
+  locked.close();
 });

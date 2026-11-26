@@ -43,7 +43,21 @@ On the [repo page](https://github.com/mafk21/raqeeb), click **Code**, then **Dow
 
 Then open **http://localhost:4317** in your browser. The page refreshes every 5 seconds.
 
-Want to look around first? Run `node server.js --demo` to see sample data.
+### First run
+
+The first time you open Raqeeb it checks for your Claude Code sessions folder and tells you plainly what it found. If it cannot find any sessions it says so and shows a short setup screen. It never fills the page with made-up data.
+
+![First-run screen](docs/first-run.png)
+
+1. **Confirm the sessions folder.** Raqeeb shows where it looked (by default `~/.claude/projects`) and lists any Claude Code folders it finds on your computer. Type a different path and press **Save and scan** if yours lives elsewhere. Raqeeb remembers it in `~/.raqeeb/config.json`.
+2. **Start a Claude Code session.** Run `claude` in any project and send a message.
+3. **Re-scan.** Press the button, or wait, the page checks every 5 seconds.
+
+If the folder exists but nothing was touched in the last 24 hours, you get a "No Claude Code sessions found" screen that says how many older session files are there.
+
+![Empty state](docs/no-sessions.png)
+
+Just want to look around? Press **Try demo with sample data** on that screen, or run `node server.js --demo`. Demo data is always marked with a red "DEMO" banner. You can reopen the setup screen any time with the **Setup** button in the top bar.
 
 ## Using it
 
@@ -52,21 +66,21 @@ Want to look around first? Run `node server.js --demo` to see sample data.
 3. Watch the **Needs your answer** list. Click an agent card to see its task, last message, token usage and working folder.
 4. Use the filter (All, Working, Waiting, Done) to focus.
 
-If Raqeeb finds no session from the last 24 hours, it shows sample data and says so in a banner at the top.
+If Raqeeb finds no session from the last 24 hours it shows the setup screen, not sample data.
 
 ### Options
 
 ```
 raqeeb [options]
 
-  --demo           show sample data instead of reading your sessions
+  --demo           start in demo mode with sample data
   --port, -p N     port to listen on (default 4317, or $PORT)
-  --dir PATH       Claude Code projects folder
+  --dir PATH       Claude Code projects folder (fixes the folder for this run)
   --version, -v    print the version
   --help, -h       show help
 ```
 
-By default it reads `~/.claude/projects`. If you set `CLAUDE_CONFIG_DIR`, it reads `$CLAUDE_CONFIG_DIR/projects` instead. Use `--dir` for any other location.
+The folder is chosen in this order: `--dir`, the folder you saved on the setup screen, then the default `~/.claude/projects`. If you set `CLAUDE_CONFIG_DIR`, it reads `$CLAUDE_CONFIG_DIR/projects` instead. Use `--dir` for any other location.
 
 ## How it decides what an agent is doing
 
@@ -123,7 +137,7 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Go
 
 ## Privacy and security
 
-Raqeeb never sends data anywhere. It reads local files and serves a page on `127.0.0.1`. Session logs can contain your code and prompts, so do not expose the port to a network.
+Raqeeb never sends data anywhere. It reads local files and serves a page on `127.0.0.1`. It only answers requests addressed to localhost, and the setup endpoint accepts same-origin requests only, so a web page you visit cannot change the folder. The only file it writes is `~/.raqeeb/config.json` (the folder you chose). Session logs can contain your code and prompts, so do not expose the port to a network.
 
 ## License
 
