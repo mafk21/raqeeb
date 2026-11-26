@@ -5,7 +5,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const os = require('os');
 const { collect, demo, demoProviders, rootFor, byId } = require('./lib/sessions');
 const config = require('./lib/config');
-const handoff = require('./lib/handoff');
+const handoff = require('./lib/handoff'), conflicts = require('./lib/conflicts');
 const prompts = require('./lib/prompts'), hooks = require('./lib/hooks'), crypto = require('crypto');
 const pkg = require('./package.json');
 
@@ -57,8 +57,8 @@ function createServer(opts) {
     if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) { res.writeHead(403); return res.end('Forbidden'); }
     const url = req.url.split('?')[0], q = new URLSearchParams(req.url.split('?')[1] || '');
     if (url === '/api/agents') {
-      if (opts.demo || q.get('demo') === '1') return json(res, 200, { agents: demo(), providers: demoProviders(), demo: true, forced: !!opts.demo, state: 'demo', now: Date.now() });
-      const r = collect(opts, config.load());
+      if (opts.demo || q.get('demo') === '1') return json(res, 200, { agents: demo(), providers: demoProviders(), hooks: hooks.all(), demo: true, forced: !!opts.demo, state: 'demo', now: Date.now() });
+      const r = collect(opts, config.load()); conflicts.annotate(r.agents);
       return json(res, 200, { ...r, hooks: hooks.all(), demo: false, now: Date.now() });
     }
     if (url === '/api/setup' && req.method === 'GET') return json(res, 200, setup());

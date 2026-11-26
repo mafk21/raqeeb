@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0
+- Same-repo warning: a tag on agent cards when two active sessions share one git checkout. Repo-level only, worktrees are not flagged. Demo mode now shows the real answering status per tool instead of "not supported" for all.
+- 2 new tests (42 total).
+
 ## 0.11.0
 - Rule-file snippet on the Handoffs page (shown and copyable, never written to your files). Notes that agents write by hand are scanned for keys when read, and hidden with a warning if one is found.
 - 1 new test (40 total).

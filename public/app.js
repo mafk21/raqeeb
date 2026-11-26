@@ -24,6 +24,7 @@ let showDismissed = false;
 window.dismiss = (id, u) => { const d = dis(); d[id] = u; localStorage.dismissed = JSON.stringify(d); last = ''; refresh(true); };
 window.undismiss = () => { localStorage.dismissed = '{}'; showDismissed = false; last = ''; refresh(true); };
 window.copyCd = (id, btn) => { const a = agents.find(x => x.id === id); if (!a) return; const t = 'cd ' + JSON.stringify(a.cwd); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { btn.textContent = 'Copied'; }, () => { prompt('Copy this command', t); }); setTimeout(() => { btn.textContent = 'Copy folder'; }, 1800); };
+const clash = a => (a.conflict && a.conflict.length) ? `<span class="clash" title="Two active sessions in the same repository checkout can overwrite each other's edits. Git worktrees avoid this.">same repo as ${esc(a.conflict.map(c => c.tool).join(', '))}</span>` : '';
 const where = a => a.cwd && a.cwd.startsWith('/') ? a.cwd : '';
 const hint = a => {
   const h = hooksInfo[a.provider] || {}, name = esc(provOf(a).name);
@@ -55,14 +56,14 @@ function promptBody(a) {
 function needCard(a) {
   const age = Math.max(1, Math.round((Date.now() - a.updated) / 60000)), live = !!a.prompt;
   const wait = live ? Math.max(0, Math.round((Date.now() - a.prompt.created) / 1000)) : 0;
-  return `<div class="need ${live ? 'ask' : ''}" ${live ? `data-pid="${esc(a.prompt.id)}"` : ''}><div class="need-h">${badge(provOf(a))}<b>${esc(a.project)}</b>${a.branch ? `<code>${esc(a.branch)}</code>` : ''}<span class="sp"></span>${live ? '<span class="age ans-here">answer here</span>' : `<span class="age ${age >= 30 ? 'old' : ''}">waiting ${age < 60 ? age + ' min' : Math.round(age / 60) + ' h'}</span>`}</div>
+  return `<div class="need ${live ? 'ask' : ''}" ${live ? `data-pid="${esc(a.prompt.id)}"` : ''}><div class="need-h">${badge(provOf(a))}<b>${esc(a.project)}</b>${a.branch ? `<code>${esc(a.branch)}</code>` : ''}${clash(a)}<span class="sp"></span>${live ? '<span class="age ans-here">answer here</span>' : `<span class="age ${age >= 30 ? 'old' : ''}">waiting ${age < 60 ? age + ' min' : Math.round(age / 60) + ' h'}</span>`}</div>
   ${live ? promptBody(a) : `<div class="need-q">${esc(a.question || a.lastSay)}</div>`}
   ${a.task ? `<div class="need-t">Task: ${esc(a.task)}</div>` : ''}
   <div class="need-a">${a.agentReal ? `<button class="btn sm" onclick="open_('${esc(a.id)}')">Details</button>` : ''}${where(a) ? `<button class="btn sm" onclick="copyCd('${esc(a.id)}',this)">Copy folder</button>` : ''}<span class="sp"></span>${live ? '' : `<button class="btn sm ghost" title="Hide until this agent says something new" onclick="dismiss('${esc(a.id)}',${a.updated})">Dismiss</button>`}</div>
   <div class="need-n">${live ? 'Your answer goes straight back to the agent. You can still answer in the terminal; if you do, this card disappears.' : hint(a)}</div></div>`;
 }
 function row(a) {
-  return `<div class="arow ${a.status}" onclick="open_('${esc(a.id)}')"><span class="dot"></span><b>${esc(a.project)}</b>${badge(provOf(a))}<span class="at">${esc(a.task)}</span><span class="sp"></span><span class="pill">${a.status === 'idle' ? 'idle' : a.status}</span><small>${ago(a.updated)}</small><small class="cost">${costText(a)}</small></div>`;
+  return `<div class="arow ${a.status}" onclick="open_('${esc(a.id)}')"><span class="dot"></span><b>${esc(a.project)}</b>${badge(provOf(a))}${clash(a)}<span class="at">${esc(a.task)}</span><span class="sp"></span><span class="pill">${a.status === 'idle' ? 'idle' : a.status}</span><small>${ago(a.updated)}</small><small class="cost">${costText(a)}</small></div>`;
 }
 function draw() {
   const d = dis(), inView = a => pfilter === 'all' || a.provider === pfilter;
@@ -146,7 +147,7 @@ async function refresh(force) {
   const needSetup = !r.demo && (r.state !== 'ok' || showSetup);
   if (needSetup && !setupData) setupData = await (await fetch('/api/setup')).json();
   if (!needSetup) setupData = null;
-  const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay]), JSON.stringify(r.hooks || {})]);
+  const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay, (a.conflict || []).length]), JSON.stringify(r.hooks || {})]);
   if (!force && sig === last) return; last = sig;
   agents = r.agents; providers = r.providers; hooksInfo = r.hooks || {};
   $('#onboard').hidden = !needSetup; $('#dash').hidden = needSetup || view === 'hand'; $('#hand').hidden = needSetup || view !== 'hand'; $('#handbtn').classList.toggle('on', view === 'hand' && !needSetup);

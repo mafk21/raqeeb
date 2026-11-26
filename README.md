@@ -173,6 +173,10 @@ The **Handoffs** button opens a notebook for each project. Write a note when you
 - Not built yet: an MCP server so agents can read and write notes themselves.
 - Tested with automated tests and a headless browser run. Not tested with real agents reading the notes yet.
 
+## Same-repo warning
+
+When two agent sessions are active (not finished, updated in the last 30 minutes) in the same git checkout, both cards show a "same repo as ..." tag, because two agents editing one working copy can overwrite each other. It compares repository roots only. It does not see which files each agent touches, and git worktrees (separate folders) are not flagged.
+
 ## Honest limitations
 
 - **Three tools for now.** Claude Code, Codex CLI, Cursor, Gemini CLI, Aider and Cline. Copilot agent mode, Windsurf, OpenCode, Amp and others are not read yet. Everything except Claude Code is experimental (see above).
