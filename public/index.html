@@ -2,7 +2,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css"></head><body>
 <header class="top"><div class="in"><div class="logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="var(--amber)"/><path d="M4 16c3.5-5.5 7.5-8 12-8s8.5 2.5 12 8c-3.5 5.5-7.5 8-12 8s-8.5-2.5-12-8z" fill="#fffaf1"/><circle cx="16" cy="16" r="5.4" fill="#15171a"/><circle cx="16" cy="16" r="2.2" fill="#fffaf1"/><circle cx="14.2" cy="14.2" r="1.3" fill="#fffaf1"/></svg>Raqeeb</div><span class="chip">FREE</span><div class="sp"></div><div class="live"><i></i>Live</div><button class="btn" id="licbtn">License</button><button class="btn" id="handbtn">Handoffs</button><button class="btn" id="setupbtn">Setup</button><button class="btn" id="theme">Theme</button></div></header>
-<div class="page"><div id="banner"></div><div id="onboard" hidden></div><div id="hand" hidden></div><div id="dash"><div class="summary" id="summary"></div>
+<div class="page"><div id="banner"></div><div id="onboard" hidden></div><div id="hand" hidden></div><div id="dash"><div id="away"></div><div class="summary" id="summary"></div>
 <section class="focus"><div class="sec-h"><h2>Needs you</h2><em id="needn"></em><span class="sp"></span><span id="dismissed"></span></div><div id="needs"></div></section>
 <section class="rest"><div class="sec-h"><h2>Everything else</h2><span class="sp"></span><div class="seg" id="pseg"></div></div><div id="board"></div></section>
 <details class="more"><summary>Usage and tools</summary><div class="more-in"><div><h3>Agent tools</h3><div id="provs"></div></div><div><h3>Spend by tool</h3><div id="spendp"></div></div><div><h3>Spend by project</h3><div id="spend"></div></div></div></details>
@@ -11,5 +11,5 @@
 <div class="lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Limits on files and commands<em>PRO</em></div>
 <div class="lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Model quality alerts<em>PRO</em></div></div></div></div>
 <div class="drawer" id="drawer"><div class="panel" id="panel"></div></div>
-<script src="/app.js"></script><dialog id="licdlg"></dialog>
+<script src="/away.js"></script><script src="/app.js"></script><dialog id="licdlg"></dialog>
 </body></html>

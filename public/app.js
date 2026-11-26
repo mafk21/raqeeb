@@ -147,7 +147,7 @@ async function refresh(force) {
   const needSetup = !r.demo && (r.state !== 'ok' || showSetup);
   if (needSetup && !setupData) setupData = await (await fetch('/api/setup')).json();
   if (!needSetup) setupData = null;
-  const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay, (a.conflict || []).length]), JSON.stringify(r.hooks || {})]);
+  const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, awayFrom, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay, (a.conflict || []).length]), JSON.stringify(r.hooks || {})]);
   if (!force && sig === last) return; last = sig;
   agents = r.agents; providers = r.providers; hooksInfo = r.hooks || {};
   $('#onboard').hidden = !needSetup; $('#dash').hidden = needSetup || view === 'hand'; $('#hand').hidden = needSetup || view !== 'hand'; $('#handbtn').classList.toggle('on', view === 'hand' && !needSetup);
@@ -156,7 +156,7 @@ async function refresh(force) {
   if (needSetup) return onboard(r, setupData);
   if (view === 'hand') loadHand();
   if (pfilter !== 'all' && !providers.some(p => p.id === pfilter)) pfilter = 'all';
-  drawProviderFilter(); draw(); animate = false;
+  drawProviderFilter(); draw(); drawAway(r); animate = false;
   $('#provs').innerHTML = providers.map(p => `<div class="sp-row prow"><span>${badge(p)}</span><small class="${p.state === 'ok' || p.state === 'demo' ? '' : 'dim'}">${esc(provLine(p))}</small></div>`).join('') + (r.demo ? '' : '<div class="note">Not seeing a tool? Press <b>Setup</b> to check its folder.</div>');
   const sum = (key, list) => { const o = {}; list.forEach(a => { const k = key(a); o[k] = o[k] || { cost: 0, tok: 0, priced: 0, n: 0 }; o[k].n++; o[k].tok += a.tokensIn + a.tokensOut; if (a.cost != null) { o[k].cost += a.cost; o[k].priced++; } }); return o; };
   const row = (n, v) => `<div class="sp-row"><span>${esc(n)}</span><b>${v.priced ? '~$' + v.cost.toFixed(2) : v.tok ? tok(v.tok) + ' tokens' : 'no usage data'}</b></div>`;
@@ -239,3 +239,21 @@ $('#licbtn').onclick = async () => {
   if ($('#licrm')) $('#licrm').onclick = async () => { await fetch('/api/license', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove' }) }); $('#licbtn').click(); };
   d.open ? 0 : d.showModal();
 };
+
+// ---- While you were away ----
+let awayFrom = +localStorage.lastSeen || 0;
+const markSeen = () => { if (document.visibilityState === 'visible') localStorage.lastSeen = Date.now(); };
+setInterval(markSeen, 30000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (!awayFrom) awayFrom = +localStorage.lastSeen || 0; last = ''; refresh(true); } markSeen(); });
+function drawAway(r) {
+  const el = $('#away'); if (!el) return;
+  const from = r.demo ? Date.now() - 3 * 3600000 : awayFrom;
+  const d = r.demo && sessionStorage.awayDismissed === '1' ? null : window.Away.away(r.agents, from, Date.now());
+  if (!d || !d.items.length) { el.innerHTML = ''; if (!r.demo) awayFrom = 0; markSeen(); return; }
+  const when = new Date(d.since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const lab = { waiting: 'Still waiting for you', finished: 'Finished or idle', working: 'Still working' };
+  const groups = ['waiting', 'finished', 'working'].map(k => { const it = d.items.filter(i => i.kind === k); return it.length ? `<div class="aw-g"><h4>${lab[k]} <small>${it.length}</small></h4>${it.map(i => `<div class="aw-i"><b>${esc(i.project)}</b> <small>${esc(i.tool)} · ${esc(ago(i.updated))}</small>${i.say ? `<div class="aw-s">${esc(i.say.slice(0, 160))}</div>` : ''}</div>`).join('')}</div>` : ''; }).join('');
+  el.innerHTML = `<section class="away"><div class="sec-h"><h2>While you were away</h2><em>since ${esc(when)}</em><span class="sp"></span><button class="btn sm" id="awayx">Got it</button></div><p class="aw-n">Each session's state now and what it last said. Nothing here is summarised or guessed.</p>${groups}</section>`;
+  $('#awayx').onclick = () => { if (r.demo) sessionStorage.awayDismissed = '1'; awayFrom = 0; markSeen(); el.innerHTML = ''; };
+}
+markSeen();

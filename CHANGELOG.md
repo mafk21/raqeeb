@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.15.0
+- While you were away: when you come back after 15+ minutes, a list of sessions that changed since you last had the page open, with each one's current state and last words. Nothing is summarised (AI summaries are not built). The "last visit" time is stored in your browser only.
+
 ## 0.14.0
 - Licence layer with feature flags. Provider-agnostic (Polar and Gumroad adapters), with empty placeholder settings in lib/license-config.js. Nothing is on sale: the License dialog says so, and no Pro feature is built. Tested with mocked provider replies only, never against a real account.
 
