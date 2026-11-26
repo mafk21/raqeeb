@@ -1,1 +1,15 @@
-{"name":"raqeeb","version":"0.1.0","description":"A control room for developers running several AI coding agents. Local, free, open core.","bin":{"raqeeb":"server.js"},"scripts":{"start":"node server.js","demo":"node server.js --demo"},"license":"MIT"}
+{
+  "name": "raqeeb",
+  "version": "0.2.0",
+  "description": "A local control room for the AI coding agents you run. See every Claude Code session, what it is working on, what it is asking you, and what it costs.",
+  "bin": { "raqeeb": "server.js" },
+  "main": "server.js",
+  "files": ["server.js", "lib", "public", "README.md", "LICENSE"],
+  "scripts": { "start": "node server.js", "demo": "node server.js --demo", "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=18" },
+  "keywords": ["claude-code", "ai-agents", "dashboard", "developer-tools", "local-first"],
+  "repository": { "type": "git", "url": "git+https://github.com/mafk21/raqeeb.git" },
+  "homepage": "https://github.com/mafk21/raqeeb",
+  "bugs": { "url": "https://github.com/mafk21/raqeeb/issues" },
+  "license": "MIT"
+}

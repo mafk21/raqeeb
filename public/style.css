@@ -67,3 +67,4 @@ body{font-family:"Space Grotesk","Inter",sans-serif}
 .pro{background:var(--surf2)}.lock{border-style:dashed}.lock em{border-radius:3px;background:var(--ink);color:var(--bg)}
 .drawer{background:rgba(21,23,26,.55)}.panel{border-left:1.5px solid var(--ink)}
 .live i{background:var(--moss)}
+.sp-row{display:flex;justify-content:space-between;padding:9px 12px;border:1.5px solid var(--ink);border-radius:6px;background:var(--surf);margin-bottom:8px;font-size:14px}.sp-row b{font-family:"JetBrains Mono",monospace;font-weight:500;font-size:13px}

@@ -3,7 +3,7 @@ root.dataset.theme = (location.hash == '#dark' ? 'dark' : null) || localStorage.
 $('#theme').onclick = () => { root.dataset.theme = localStorage.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
-const cost = a => (a.tokensIn * 3 + a.tokensOut * 15) / 1e6;
+const cost = a => a.cost != null ? a.cost : (a.tokensIn * 3 + a.tokensOut * 15) / 1e6;
 let agents = [], filter = 'all', last = '', animate = true;
 const bucket = a => a.status === 'idle' ? 'working' : a.status;
 document.querySelectorAll('#seg button').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('on', x === b)); draw(); });
@@ -22,11 +22,13 @@ function draw() {
 window.open_ = open;
 async function load() {
   const r = await (await fetch('/api/agents')).json(); const sig = JSON.stringify(r.agents.map(a => [a.id, a.status, a.updated, a.lastSay])); if (sig === last) return; last = sig; agents = r.agents;
-  $('#banner').innerHTML = r.demo ? '<div class="banner">Showing demo data. Start a Claude Code session and your real agents appear here.</div>' : '';
+  $('#banner').innerHTML = r.demo ? `<div class="banner">${r.root == null ? 'Demo mode: showing sample data.' : r.found ? 'No Claude Code session in the last 24 hours, so this is sample data. Start one and your real agents appear here.' : 'Could not find Claude Code sessions at ' + esc(r.root) + ', so this is sample data. Use --dir to point at your projects folder.'}</div>` : '';
   const c = s => agents.filter(a => a.status === s).length;
   $('#stats').innerHTML = [['', c('working') + c('idle'), 'Working'], ['hot', c('waiting'), 'Waiting on you'], ['', c('done'), 'Done'], ['amb', '$' + agents.reduce((s, a) => s + cost(a), 0).toFixed(2), 'Est. spend']].map(([k, n, l]) => `<div class="kpi ${k}"><small>${l}</small><b>${n}</b></div>`).join('');
   draw(); animate = false;
   const qs = agents.filter(a => a.question);
   $('#inbox').innerHTML = qs.length ? qs.map(a => `<div class="q"><small>${esc(a.project)} · ${ago(a.updated)}</small><div>${esc(a.question)}</div></div>`).join('') : '<div class="empty">No agent is waiting on you.</div>';
+  const byProj = {}; agents.forEach(a => byProj[a.project] = (byProj[a.project] || 0) + cost(a));
+  $('#spend').innerHTML = Object.entries(byProj).sort((a, b) => b[1] - a[1]).map(([p, c]) => `<div class="sp-row"><span>${esc(p)}</span><b>~$${c.toFixed(2)}</b></div>`).join('') || '<div class="empty">No spend yet.</div>';
 }
-load(); setInterval(load, 5000);
+load().catch(() => {}); setInterval(() => load().catch(() => {}), 5000);
