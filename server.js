@@ -28,6 +28,7 @@ const HELP = `Raqeeb ${pkg.version}: a local control room for your AI coding age
 Usage: raqeeb [options]
        raqeeb wrap aider [aider args]                          run Aider so the dashboard can answer its (Y)es/(N)o prompts
        raqeeb hooks <print|install|uninstall> <claude|codex>   let the dashboard answer that tool
+       raqeeb mcp [print]                                      handoff notes as an MCP server for the current project
 
   --demo           start in demo mode with sample data (otherwise Raqeeb never shows sample data unless you click "Try demo")
   --port, -p N     port to listen on (default 4317, or $PORT)
@@ -115,10 +116,11 @@ function createServer(opts) {
     }
     // Handoff notes. Projects are the working folders of agent sessions Raqeeb has seen, so a request cannot point at any other folder.
     const projectDirs = () => { const seen = new Set(); collect(opts, config.load()).agents.forEach(a => { if (a.cwd && path.isAbsolute(a.cwd)) { try { if (fs.statSync(a.cwd).isDirectory()) seen.add(fs.realpathSync(a.cwd)); } catch {} } }); return [...seen]; };
+    const mcpCmd = 'claude mcp add raqeeb -- node ' + JSON.stringify(path.join(__dirname, 'server.js')) + ' mcp';
     if (url === '/api/handoff' && req.method === 'GET') {
-      if (opts.demo || q.get('demo') === '1') return json(res, 200, { demo: true, projects: [handoff.demo()] });
+      if (opts.demo || q.get('demo') === '1') return json(res, 200, { demo: true, projects: [handoff.demo()], mcpCommand: mcpCmd });
       const byRoot = new Map(); projectDirs().forEach(d => { const l = handoff.list(d); const k = l.root; if (!byRoot.has(k) || byRoot.get(k).cwd.length > d.length) byRoot.set(k, l); });
-      return json(res, 200, { demo: false, projects: [...byRoot.values()].sort((a, b) => (b.notes.length + b.pinned.length) - (a.notes.length + a.pinned.length) || (a.project < b.project ? -1 : 1)) });
+      return json(res, 200, { demo: false, mcpCommand: mcpCmd, projects: [...byRoot.values()].sort((a, b) => (b.notes.length + b.pinned.length) - (a.notes.length + a.pinned.length) || (a.project < b.project ? -1 : 1)) });
     }
     if (url === '/api/handoff/draft' && req.method === 'GET') {
       if (opts.demo || q.get('demo') === '1') return json(res, 400, { error: 'Demo agents are made up, so there is nothing to draft from.' });
@@ -156,6 +158,12 @@ function createServer(opts) {
   return srv;
 }
 
+if (require.main === module && process.argv[2] === 'mcp') {
+  // `raqeeb mcp` runs the handoff notes MCP server for the project in the current folder. Nothing is printed except protocol messages.
+  if (process.argv[3] === 'print') { console.log('Add it to Claude Code (from your project folder):\n  claude mcp add raqeeb -- ' + (process.argv[1] ? 'node ' + JSON.stringify(path.resolve(process.argv[1])) : 'raqeeb') + ' mcp\nIt serves the notes of the folder Claude Code starts in.'); process.exit(0); }
+  require('./lib/mcp').run(process.stdin, process.stdout, process.env.RAQEEB_PROJECT || process.cwd());
+  process.stdin.on('end', () => process.exit(0));
+}
 if (require.main === module && process.argv[2] === 'wrap') {
   const r = require('child_process').spawnSync('python3', [path.join(__dirname, 'wrap.py'), ...process.argv.slice(3)], { stdio: 'inherit' });
   if (r.error) { console.error('The wrapper needs python3 (standard library only): ' + r.error.message); process.exit(1); }
@@ -174,7 +182,7 @@ if (require.main === module && process.argv[2] === 'hooks') {
   } catch (e) { console.error('Could not change the file: ' + e.message + '. Nothing was written.'); process.exit(1); }
   process.exit(0);
 }
-if (require.main === module) {
+if (require.main === module && !['mcp', 'wrap', 'hooks'].includes(process.argv[2])) {
   const o = parseArgs(process.argv.slice(2));
   if (o.version) { console.log(pkg.version); process.exit(0); }
   if (o.help) { console.log(HELP); process.exit(o.bad ? 1 : 0); }

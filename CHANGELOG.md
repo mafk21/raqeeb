@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0
+- MCP server for handoff notes: `raqeeb mcp` (tools handoff_read, handoff_write), Claude Code first. Handoffs page shows the connect command. A real Claude Code 2.1.332 connected to it; a model calling the tools was not tested.
+- 2 new tests (44 total).
+
 ## 0.12.0
 - Same-repo warning: a tag on agent cards when two active sessions share one git checkout. Repo-level only, worktrees are not flagged. Demo mode now shows the real answering status per tool instead of "not supported" for all.
 - 2 new tests (42 total).

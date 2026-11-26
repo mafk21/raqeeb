@@ -170,7 +170,7 @@ The **Handoffs** button opens a notebook for each project. Write a note when you
 - A project shows up once Raqeeb has seen an agent session in that folder in the last 24 hours.
 - **Save handoff** in an agent's detail panel drafts a note from its last message and the files git shows as changed. It opens in the form for you to edit, and nothing is saved until you press Save note.
 - Below the notes list, **Let agents read and write these notes** shows a block to paste into `CLAUDE.md`, `AGENTS.md` or your tool's rules. Raqeeb only shows it. A note an agent writes this way is checked for keys when Raqeeb reads it, and hidden if it looks like it holds one.
-- Not built yet: an MCP server so agents can read and write notes themselves.
+- **MCP server (Claude Code first).** `raqeeb mcp` is a small stdio MCP server with two tools, `handoff_read` and `handoff_write`, for the notes of the folder it starts in. Connect it with `claude mcp add raqeeb -- node /path/to/raqeeb/server.js mcp` (the Handoffs page shows the exact command). Notes it returns are labelled as background, not instructions. Writes go through the same 2 KB cap and key check as the form. Tested: automated protocol tests, and a real Claude Code 2.1.332 connected to it (`claude mcp list` showed Connected). Not tested: a real Claude Code session calling the tools. Other tools that speak MCP may work but are untested.
 - Tested with automated tests and a headless browser run. Not tested with real agents reading the notes yet.
 
 ## Same-repo warning
