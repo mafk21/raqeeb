@@ -1,10 +1,10 @@
 {
   "name": "raqeeb",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "One local control room for all your AI coding agents: Claude Code, Codex CLI, Cursor, Gemini CLI, Aider and Cline. See what each is working on, what it is asking you, and what it costs.",
   "bin": { "raqeeb": "server.js" },
   "main": "server.js",
-  "files": ["server.js", "lib", "public", "README.md", "LICENSE"],
+  "files": ["server.js", "hook.js", "lib", "public", "README.md", "LICENSE"],
   "scripts": { "start": "node server.js", "demo": "node server.js --demo", "test": "node --test test/*.test.js" },
   "engines": { "node": ">=18" },
   "keywords": ["codex", "cursor", "gemini-cli", "aider", "cline", "claude-code", "ai-agents", "dashboard", "developer-tools", "local-first"],

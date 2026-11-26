@@ -5,6 +5,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const os = require('os');
 const { collect, demo, demoProviders, rootFor, byId } = require('./lib/sessions');
 const config = require('./lib/config');
+const prompts = require('./lib/prompts'), hooks = require('./lib/hooks'), crypto = require('crypto');
 const pkg = require('./package.json');
 
 function parseArgs(argv) {
@@ -24,6 +25,7 @@ function parseArgs(argv) {
 const HELP = `Raqeeb ${pkg.version}: a local control room for your AI coding agents
 
 Usage: raqeeb [options]
+       raqeeb hooks <print|install|uninstall> <claude|codex>   let the dashboard answer that tool
 
   --demo           start in demo mode with sample data (otherwise Raqeeb never shows sample data unless you click "Try demo")
   --port, -p N     port to listen on (default 4317, or $PORT)
@@ -34,19 +36,20 @@ Usage: raqeeb [options]
 
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
-function readBody(req, cb) {
-  let b = ''; req.on('data', d => { b += d; if (b.length > 10000) req.destroy(); });
+function readBody(req, cb, max) {
+  let b = ''; req.on('data', d => { b += d; if (b.length > (max || 10000)) req.destroy(); });
   req.on('end', () => { try { cb(null, JSON.parse(b || '{}')); } catch (e) { cb(e); } });
 }
 
 function createServer(opts) {
+  let hookToken = '';
   opts.dirs = opts.dirs || {};
   const json = (res, code, o) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
   const setup = () => {
     const r = collect(opts, config.load());
-    return { providers: r.providers.map(p => ({ ...p, candidates: byId[p.id].candidates().map(c => byId[p.id].inspect(c)), defaultRoot: byId[p.id].defaultRoot() })) };
+    return { hooks: hooks.all(), providers: r.providers.map(p => ({ ...p, candidates: byId[p.id].candidates().map(c => byId[p.id].inspect(c)), defaultRoot: byId[p.id].defaultRoot() })) };
   };
-  return http.createServer((req, res) => {
+  const srv = http.createServer((req, res) => {
     // Only answer requests addressed to localhost, which blocks DNS-rebinding tricks from other sites.
     const host = (req.headers.host || '').replace(/:\d+$/, '');
     if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) { res.writeHead(403); return res.end('Forbidden'); }
@@ -54,7 +57,7 @@ function createServer(opts) {
     if (url === '/api/agents') {
       if (opts.demo || q.get('demo') === '1') return json(res, 200, { agents: demo(), providers: demoProviders(), demo: true, forced: !!opts.demo, state: 'demo', now: Date.now() });
       const r = collect(opts, config.load());
-      return json(res, 200, { ...r, demo: false, now: Date.now() });
+      return json(res, 200, { ...r, hooks: hooks.all(), demo: false, now: Date.now() });
     }
     if (url === '/api/setup' && req.method === 'GET') return json(res, 200, setup());
     if (url === '/api/setup' && req.method === 'POST') {
@@ -78,6 +81,36 @@ function createServer(opts) {
         json(res, 200, setup());
       });
     }
+    const sameOrigin = () => { const o = req.headers.origin; return !!o && o === 'http://' + req.headers.host; };
+    if (url === '/api/prompts' && req.method === 'GET') { prompts.touchViewer(); return json(res, 200, { prompts: prompts.list() }); }
+    if (url === '/api/hook/request' && req.method === 'POST') {
+      // Called by hook.js, never by a browser: a browser always sends an Origin header, so any request with one is refused.
+      const tok = String(req.headers['x-raqeeb-token'] || '');
+      if (req.headers.origin || !hookToken || tok.length !== hookToken.length || !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(hookToken))) return json(res, 403, { error: 'Forbidden' });
+      return readBody(req, (e, b) => {
+        if (e || !['claude', 'codex'].includes(b.tool) || !b.payload || typeof b.payload !== 'object') return json(res, 400, { error: 'Bad request' });
+        // Nobody is looking at the dashboard: do not hold the agent up, let its own prompt show.
+        if (!prompts.viewerActive()) return json(res, 200, { decision: null, reason: 'no-viewer' });
+        const item = prompts.create(b.tool, b.payload);
+        let finished = false;
+        const finish = d => { if (finished) return; finished = true; clearTimeout(timer); clearInterval(watch); prompts.remove(item.id); json(res, 200, { decision: d || null }); };
+        const timer = setTimeout(() => finish(null), Math.min(Math.max(+b.wait || 120, 1), 140) * 1000);
+        const watch = setInterval(() => { if (!prompts.viewerActive()) finish(null); }, 2000);
+        item.done = finish;
+        res.on('close', () => { if (!finished) { finished = true; clearTimeout(timer); clearInterval(watch); prompts.remove(item.id); } });
+      }, 200000);
+    }
+    const am = url.match(/^\/api\/prompts\/([a-f0-9]{24})\/answer$/);
+    if (am && req.method === 'POST') {
+      if (!sameOrigin()) return json(res, 403, { error: 'Forbidden' });
+      if (!/application\/json/.test(req.headers['content-type'] || '')) return json(res, 415, { error: 'Send JSON' });
+      const item = prompts.get(am[1]); if (!item) return json(res, 404, { error: 'That question is no longer waiting. It may have been answered in the terminal.' });
+      return readBody(req, (e, b) => {
+        const d = e ? null : prompts.decide(item, b);
+        if (!d) return json(res, 400, { error: 'That answer does not match the question.' });
+        item.done(d.none ? null : d); json(res, 200, { ok: true });
+      });
+    }
     if (url === '/api/health') return json(res, 200, { ok: true, version: pkg.version });
     const pub = path.join(__dirname, 'public');
     const f = path.normalize(path.join(pub, url === '/' ? 'index.html' : url));
@@ -87,8 +120,27 @@ function createServer(opts) {
       res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream' }); res.end(d);
     });
   });
+  // The hook helper finds this server and its token in ~/.raqeeb/hook.json (readable only by you).
+  srv.on('listening', () => {
+    hookToken = crypto.randomBytes(24).toString('hex');
+    try { const f = path.join(path.dirname(config.file()), 'hook.json'); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify({ port: srv.address().port, token: hookToken }), { mode: 0o600 }); fs.chmodSync(f, 0o600); } catch {}
+  });
+  return srv;
 }
 
+if (require.main === module && process.argv[2] === 'hooks') {
+  const [, , , act, tool] = process.argv, ok = ['print', 'install', 'uninstall', 'status'];
+  if (!ok.includes(act) || (act !== 'status' && !hooks.SUPPORT[tool])) {
+    console.error('Usage: raqeeb hooks <print|install|uninstall> <claude|codex>\n       raqeeb hooks status\nSupported: ' + Object.keys(hooks.SUPPORT).join(', '));
+    process.exit(1);
+  }
+  try {
+    if (act === 'print') console.log(JSON.stringify(hooks.snippet(tool), null, 2));
+    else if (act === 'status') console.log(JSON.stringify(hooks.all(), null, 2));
+    else { const r = hooks[act](tool); console.log((r.changed ? (act === 'install' ? 'Added the Raqeeb hook to ' : 'Removed the Raqeeb hook from ') : 'No change needed in ') + r.file + (r.backup ? '\nBackup: ' + r.backup : '') + (act === 'install' ? '\n' + hooks.SUPPORT[tool].after : '')); }
+  } catch (e) { console.error('Could not change the file: ' + e.message + '. Nothing was written.'); process.exit(1); }
+  process.exit(0);
+}
 if (require.main === module) {
   const o = parseArgs(process.argv.slice(2));
   if (o.version) { console.log(pkg.version); process.exit(0); }

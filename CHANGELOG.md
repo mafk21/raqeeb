@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+- Answer from the dashboard for Claude Code (approve or deny, plus multiple-choice questions) and Codex CLI (approve or deny), through each tool's `PermissionRequest` hook. Turn on with `raqeeb hooks install claude|codex`.
+- Question cards show the real command or file, option buttons, and an "Answer in terminal instead" button. If you answer in the terminal, the card goes away.
+- Safe by default: no dashboard open means the tool shows its own prompt right away; a 2 minute limit; same-origin answers only; token-protected helper; answers validated against the offered options.
+- Setup screen shows, per tool, whether answering is supported, and why not when it is not (Cursor, Gemini CLI, Cline, Aider).
+- 7 new tests, including a helper-process test and a real browser click-through run on fixtures. Not tested on real Claude Code or Codex installs.
+
 ## 0.6.0
 - Question-first dashboard. The top of the page says how many agents need you, then lists each question with the tool, project, task and how long it has waited. Details, Copy folder and Dismiss on each (dismissed until the agent says something new).
 - Everything else is one line per agent, grouped Working and Finished. Usage, tool status and spend moved into a collapsed "Usage and tools" section.

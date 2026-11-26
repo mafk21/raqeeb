@@ -105,6 +105,39 @@ Cursor specifics: Raqeeb reads the plain-text transcript copy that the Cursor Ag
 
 Want another tool? See [CONTRIBUTING.md](CONTRIBUTING.md#adding-an-agent-provider). It is one small file.
 
+## Answer from the dashboard
+
+For **Claude Code** and **Codex CLI**, a question card can have real buttons. Raqeeb uses each tool's own `PermissionRequest` hook: the tool runs a small helper (`hook.js`) at the moment it would ask you, the helper asks this dashboard, and your click goes back as the answer.
+
+| Tool | What you can do from the card | Source |
+| --- | --- | --- |
+| Claude Code | Approve or deny a permission prompt (including plan approval). Pick an option for a multiple-choice question (`AskUserQuestion`). | [hooks reference](https://code.claude.com/docs/en/hooks), [answering AskUserQuestion from a hook](https://dev.to/dawonlee/you-can-answer-claude-codes-askuserquestion-from-a-hook-and-from-your-phone-1ddn) |
+| Codex CLI | Approve or deny an approval prompt. Questions are not supported. | [Codex hooks](https://learn.chatgpt.com/docs/hooks) |
+| Cursor, Gemini CLI | Not supported. Their hooks run before every command, not only when you are asked, so Raqeeb cannot tell a real approval prompt from a routine call. | [Cursor hooks](https://cursor.com/docs/hooks), [Gemini CLI hooks](https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md) |
+| Cline, Aider | Not supported. No documented way for another program to answer. | |
+
+Turn it on once per tool:
+
+```
+node server.js hooks install claude     # or: raqeeb hooks install claude
+node server.js hooks install codex      # then open /hooks in Codex and trust the hook
+node server.js hooks print claude       # just show the settings entry, change nothing
+node server.js hooks uninstall claude
+```
+
+`install` adds one entry to `~/.claude/settings.json` (or `~/.codex/hooks.json`), keeps a `.raqeeb-backup` copy, leaves the file alone if it is not valid JSON, and is safe to run twice. Restart running sessions afterwards.
+
+How it behaves, so nothing surprises you:
+
+- **The terminal always still works.** If Raqeeb is not running, if no dashboard tab is open and visible, if you press **Answer in terminal instead**, or if 2 minutes pass, the helper prints nothing and the tool shows its normal prompt. The helper can never approve anything on its own.
+- **Keep the dashboard tab visible** while you want to answer from it. A hidden browser tab may pause, and Raqeeb then hands prompts back to the terminal.
+- **Whether the terminal prompt shows while the helper waits is not something Raqeeb controls or has verified.** If you answer in the terminal, the card disappears.
+- Answers are checked: a question only accepts one of the offered options, and an approve button cannot answer a question.
+- Security: the helper talks to `127.0.0.1` with a random token in `~/.raqeeb/hook.json` (readable only by you). The dashboard's answer endpoint accepts same-origin requests only. Pending prompts live in memory and are never written to disk.
+- Not tested against a real Claude Code or Codex install. If a hook behaves differently on your version, please open an issue.
+
+![Questions the dashboard can answer](docs/dashboard-answer.png)
+
 ## How it decides what an agent is doing
 
 Raqeeb reads the session logs (`.jsonl` files) each tool writes, read-only, and never changes them. The same rules apply to every tool.
@@ -123,7 +156,7 @@ Sessions untouched for 24 hours are hidden.
 - **Three tools for now.** Claude Code, Codex CLI, Cursor, Gemini CLI, Aider and Cline. Copilot agent mode, Windsurf, OpenCode, Amp and others are not read yet. Everything except Claude Code is experimental (see above).
 - **Status is a guess.** It comes from file timestamps and whether the last message was a question. An agent that asks something without a question mark will look "idle" or "done". A long tool run with no output can look idle.
 - **Cost is an estimate, and only where a rate is set.** Claude Code uses example per-token rates in [`lib/pricing.js`](lib/pricing.js), with cache reads not counted. The other five have no rates, so they show tokens (or "no usage data") and are left out of the dollar total, which says how many are unpriced. Rates change and plans differ, so treat the number as a rough guide, not a bill. Add rates in that file if you want them.
-- **It only watches.** You cannot answer or approve from the dashboard yet. Go back to the terminal to reply.
+- **Answering works for two tools only.** Claude Code and Codex CLI, once you run `raqeeb hooks install`. For Cursor, Gemini CLI, Cline and Aider Raqeeb still only watches, and the card says why (see [Answer from the dashboard](#answer-from-the-dashboard)). The hooks were written from each tool's documentation and are tested here against a simulated hook caller, not a real Claude Code or Codex install.
 - **Tested with sample files, not real installs.** The automated tests use fixture files written from each tool's published format notes. Nothing has been checked against real Claude Code, Codex or Cursor logs yet. If your real logs look different and something shows wrong, please open an issue.
 
 ## Roadmap: Raqeeb Pro (not built yet)
@@ -162,7 +195,7 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Go
 
 ## Privacy and security
 
-Raqeeb never sends data anywhere. It reads local files and serves a page on `127.0.0.1`. It only answers requests addressed to localhost, and the setup endpoint accepts same-origin requests only, so a web page you visit cannot change the folder. The only file it writes is `~/.raqeeb/config.json` (the folder you chose). Session logs can contain your code and prompts, so do not expose the port to a network.
+Raqeeb never sends data anywhere. It reads local files and serves a page on `127.0.0.1`. It only answers requests addressed to localhost, and the setup endpoint accepts same-origin requests only, so a web page you visit cannot change the folder. The files it writes are `~/.raqeeb/config.json` (the folder you chose) and `~/.raqeeb/hook.json` (port and a random token for the answer helper), plus a settings entry only when you run `raqeeb hooks install`. Session logs can contain your code and prompts, so do not expose the port to a network.
 
 ## License
 

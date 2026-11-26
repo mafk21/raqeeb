@@ -7,7 +7,7 @@ const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 
 const money = c => c == null ? null : '~$' + c.toFixed(2);
 const tok = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n);
 const costText = a => a.cost != null ? money(a.cost) : a.hasUsage ? tok(a.tokensIn + a.tokensOut) + ' tokens' : 'no usage data';
-let agents = [], providers = [], filter = 'all', pfilter = 'all', last = '', animate = true, demoOn = sessionStorage.demo === '1', showSetup = false, setupData = null;
+let prompts = [], hooksInfo = {}, sel = {}, agents = [], providers = [], filter = 'all', pfilter = 'all', last = '', animate = true, demoOn = sessionStorage.demo === '1', showSetup = false, setupData = null;
 const bucket = a => a.status === 'idle' ? 'working' : a.status;
 const badge = p => `<span class="tag t-${esc(p.id || p.provider)}">${esc(p.name || p.tool)}${p.experimental ? '<i title="Experimental: built from published format notes, not yet checked against a real install">beta</i>' : ''}</span>`;
 const provOf = a => providers.find(p => p.id === a.provider) || { id: a.provider, name: a.tool };
@@ -25,26 +25,55 @@ window.dismiss = (id, u) => { const d = dis(); d[id] = u; localStorage.dismissed
 window.undismiss = () => { localStorage.dismissed = '{}'; showDismissed = false; last = ''; refresh(true); };
 window.copyCd = (id, btn) => { const a = agents.find(x => x.id === id); if (!a) return; const t = 'cd ' + JSON.stringify(a.cwd); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { btn.textContent = 'Copied'; }, () => { prompt('Copy this command', t); }); setTimeout(() => { btn.textContent = 'Copy folder'; }, 1800); };
 const where = a => a.cwd && a.cwd.startsWith('/') ? a.cwd : '';
+const hint = a => {
+  const h = hooksInfo[a.provider] || {}, name = esc(provOf(a).name);
+  if (h.supported && h.installed) return `Answer in the terminal. Dashboard answering is on for ${name}, but this question did not arrive through it (restart the session after setting it up).`;
+  if (h.supported) return `Answer in the terminal, or <button class="link" onclick="openSetup()">set up answering from here</button> for ${name}.`;
+  return `Answer in the terminal or app where this agent runs. Raqeeb cannot answer for ${name}: ${esc(h.why || 'not supported')}`;
+};
+window.openSetup = () => { showSetup = true; last = ''; refresh(true); };
+window.pick = (pid, qi, oi, multi) => { const p = prompts.find(x => x.id === pid); if (!p) return; const l = p.questions[qi].options[oi].label; sel[pid] = sel[pid] || {}; let cur = sel[pid][qi] || [];
+  cur = multi ? (cur.includes(l) ? cur.filter(x => x !== l) : [...cur, l]) : [l]; sel[pid][qi] = cur; paintSel(pid); };
+function paintSel(pid) { const p = prompts.find(x => x.id === pid); if (!p) return; const el = document.querySelector(`[data-pid="${pid}"]`); if (!el) return;
+  p.questions.forEach((q, qi) => q.options.forEach((o, oi) => { const b = el.querySelector(`[data-o="${qi}-${oi}"]`); if (b) b.classList.toggle('on', ((sel[pid] || {})[qi] || []).includes(o.label)); }));
+  const ok = p.questions.every((q, qi) => ((sel[pid] || {})[qi] || []).length); const send = el.querySelector('.send'); if (send) send.disabled = !ok; }
+window.answer = async (pid, action) => { const p = prompts.find(x => x.id === pid); if (!p) return; const body = { action };
+  if (action === 'answer') { body.answers = {}; p.questions.forEach((q, qi) => { const v = (sel[pid] || {})[qi] || []; body.answers[q.question] = q.multiSelect ? v : v[0]; }); }
+  const el = document.querySelector(`[data-pid="${pid}"] .need-n`); if (el) el.textContent = 'Sending...';
+  const x = await post('/api/prompts/' + pid + '/answer', body);
+  if (el) el.textContent = x.ok ? (action === 'terminal' ? 'Handed back to the terminal.' : 'Sent. The agent should continue in a moment.') : x.body.error;
+  if (x.ok) setTimeout(pollPrompts, 300); };
+function promptBody(a) {
+  const p = a.prompt, pid = esc(p.id);
+  if (p.kind === 'question') return `<div class="need-q">${esc(p.title)}</div>` + p.questions.map((q, qi) => `<div class="qq"><div class="qh">${q.header ? `<em>${esc(q.header)}</em>` : ''}${esc(q.question)}${q.multiSelect ? ' <small>(pick any)</small>' : ''}</div><div class="opts">${q.options.map((o, oi) => `<button class="opt" data-o="${qi}-${oi}" onclick="pick('${pid}',${qi},${oi},${q.multiSelect})"><b>${esc(o.label)}</b>${o.description ? `<span>${esc(o.description)}</span>` : ''}</button>`).join('')}</div></div>`).join('')
+    + `<div class="need-a"><button class="btn sm pri send" disabled onclick="answer('${pid}','answer')">Send answer</button><button class="btn sm" onclick="answer('${pid}','terminal')">Answer in terminal instead</button></div>`;
+  return `<div class="need-q">${esc(p.title)}</div>${p.detail ? `<pre class="need-d">${esc(p.detail)}</pre>` : ''}${p.reason ? `<div class="need-t">${esc(p.reason)}</div>` : ''}
+    <div class="need-a"><button class="btn sm pri" onclick="answer('${pid}','allow')">Approve</button><button class="btn sm" onclick="answer('${pid}','deny')">Deny</button><button class="btn sm ghost" onclick="answer('${pid}','terminal')">Answer in terminal instead</button></div>`;
+}
 function needCard(a) {
-  const age = Math.max(1, Math.round((Date.now() - a.updated) / 60000));
-  return `<div class="need"><div class="need-h">${badge(provOf(a))}<b>${esc(a.project)}</b>${a.branch ? `<code>${esc(a.branch)}</code>` : ''}<span class="sp"></span><span class="age ${age >= 30 ? 'old' : ''}">waiting ${age < 60 ? age + ' min' : Math.round(age / 60) + ' h'}</span></div>
-  <div class="need-q">${esc(a.question || a.lastSay)}</div>
-  <div class="need-t">Task: ${esc(a.task)}</div>
-  <div class="need-a"><button class="btn sm" onclick="open_('${esc(a.id)}')">Details</button>${where(a) ? `<button class="btn sm" onclick="copyCd('${esc(a.id)}',this)">Copy folder</button>` : ''}<span class="sp"></span><button class="btn sm ghost" title="Hide until this agent says something new" onclick="dismiss('${esc(a.id)}',${a.updated})">Dismiss</button></div>
-  <div class="need-n">Answer in the terminal or app where this agent runs.</div></div>`;
+  const age = Math.max(1, Math.round((Date.now() - a.updated) / 60000)), live = !!a.prompt;
+  const wait = live ? Math.max(0, Math.round((Date.now() - a.prompt.created) / 1000)) : 0;
+  return `<div class="need ${live ? 'ask' : ''}" ${live ? `data-pid="${esc(a.prompt.id)}"` : ''}><div class="need-h">${badge(provOf(a))}<b>${esc(a.project)}</b>${a.branch ? `<code>${esc(a.branch)}</code>` : ''}<span class="sp"></span>${live ? '<span class="age ans-here">answer here</span>' : `<span class="age ${age >= 30 ? 'old' : ''}">waiting ${age < 60 ? age + ' min' : Math.round(age / 60) + ' h'}</span>`}</div>
+  ${live ? promptBody(a) : `<div class="need-q">${esc(a.question || a.lastSay)}</div>`}
+  ${a.task ? `<div class="need-t">Task: ${esc(a.task)}</div>` : ''}
+  <div class="need-a">${a.agentReal ? `<button class="btn sm" onclick="open_('${esc(a.id)}')">Details</button>` : ''}${where(a) ? `<button class="btn sm" onclick="copyCd('${esc(a.id)}',this)">Copy folder</button>` : ''}<span class="sp"></span>${live ? '' : `<button class="btn sm ghost" title="Hide until this agent says something new" onclick="dismiss('${esc(a.id)}',${a.updated})">Dismiss</button>`}</div>
+  <div class="need-n">${live ? 'Your answer goes straight back to the agent. You can still answer in the terminal; if you do, this card disappears.' : hint(a)}</div></div>`;
 }
 function row(a) {
   return `<div class="arow ${a.status}" onclick="open_('${esc(a.id)}')"><span class="dot"></span><b>${esc(a.project)}</b>${badge(provOf(a))}<span class="at">${esc(a.task)}</span><span class="sp"></span><span class="pill">${a.status === 'idle' ? 'idle' : a.status}</span><small>${ago(a.updated)}</small><small class="cost">${costText(a)}</small></div>`;
 }
 function draw() {
   const d = dis(), inView = a => pfilter === 'all' || a.provider === pfilter;
-  const asks = agents.filter(a => a.status === 'waiting' && inView(a)).sort((x, y) => x.updated - y.updated);
-  const hidden = asks.filter(a => d[a.id] === a.updated), shown = asks.filter(a => d[a.id] !== a.updated);
+  const pFor = a => prompts.find(p => a.id === p.tool + ':' + p.sessionId);
+  const real = agents.filter(a => (a.status === 'waiting' || pFor(a)) && inView(a)).map(a => ({ ...a, prompt: pFor(a), agentReal: true }));
+  const lone = prompts.filter(p => !agents.some(a => a.id === p.tool + ':' + p.sessionId) && (pfilter === 'all' || p.tool === pfilter)).map(p => ({ id: 'prompt:' + p.id, provider: p.tool, tool: p.tool, project: (p.cwd.split('/').filter(Boolean).pop() || 'unknown folder'), branch: '', cwd: p.cwd, task: '', question: p.title, updated: p.created, status: 'waiting', prompt: p, agentReal: false }));
+  const asks = [...real, ...lone].sort((x, y) => (!!y.prompt - !!x.prompt) || x.updated - y.updated);
+  const hidden = asks.filter(a => !a.prompt && d[a.id] === a.updated), shown = asks.filter(a => a.prompt || d[a.id] !== a.updated);
   $('#needn').textContent = shown.length ? shown.length : '';
   $('#dismissed').innerHTML = hidden.length ? `${hidden.length} dismissed <button class="link" onclick="undismiss()">show again</button>` : '';
   const working = agents.filter(a => a.status === 'working' && inView(a)).length + agents.filter(a => a.status === 'idle' && inView(a)).length;
   $('#needs').innerHTML = shown.length ? shown.map(needCard).join('') : `<div class="calm"><b>${asks.length ? 'Everything is dismissed.' : 'Nothing is waiting on you.'}</b><span>${agents.length ? (working ? working + ' agent' + (working === 1 ? ' is' : 's are') + ' still working. ' : '') + 'When an agent stops to ask a question, it shows up here first.' : 'When an agent stops to ask a question, it shows up here first.'}</span></div>`;
-  const rest = agents.filter(a => a.status !== 'waiting' && inView(a));
+  const rest = agents.filter(a => a.status !== 'waiting' && !pFor(a) && inView(a));
   const g = (t, l) => l.length ? `<div class="grp">${t} <em>${l.length}</em></div>` + l.map(row).join('') : '';
   const live = rest.filter(a => a.status === 'working' || a.status === 'idle'), fin = rest.filter(a => a.status === 'done');
   $('#board').innerHTML = rest.length ? g('Working', live) + g('Finished', fin) : `<div class="empty">${pfilter === 'all' ? 'No other agents right now.' : 'No ' + esc((providers.find(p => p.id === pfilter) || {}).name) + ' sessions besides the ones above.'}</div>`;
@@ -66,6 +95,11 @@ const provLine = p => p.state === 'demo' ? `${p.count} sample` : p.state === 'ok
 async function post(url, body) { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return { ok: r.ok, body: await r.json() }; }
 const rerun = async () => { setupData = null; last = ''; await refresh(true); };
 
+function answerRow(p) {
+  const h = ((setupData && setupData.hooks) || hooksInfo)[p.id]; if (!h) return '';
+  if (!h.supported) return `<div class="ob-k">Answer from Raqeeb</div><div class="ans no"><b>Not supported.</b> ${esc(h.why)}</div>`;
+  return `<div class="ob-k">Answer from Raqeeb</div><div class="ans ${h.installed ? 'yes' : ''}"><b>${h.installed ? 'Set up.' : 'Available.'}</b> ${esc(h.does)}${h.installed ? '' : ' To turn it on, run:'}</div>${h.installed ? '' : `<pre class="cmd">${esc(h.install)}</pre>`}<div class="note">${esc(h.after)} Backup of your settings is kept next to the file (${esc(h.file)}). Untested against a real install.</div>`;
+}
 function provCard(p) {
   const info = p.info, found = info.exists && info.isDir;
   const cls = p.state === 'ok' ? 'good' : p.state === 'no-sessions' ? 'warn' : 'bad';
@@ -79,6 +113,7 @@ function provCard(p) {
     <form class="dirform"><input value="${esc(p.root)}" spellcheck="false" aria-label="${esc(p.name)} folder" ${p.locked ? 'readonly' : ''}><div class="ob-row"><button class="btn sm pri" type="submit" ${p.locked ? 'disabled' : ''}>Save and scan</button><button class="btn sm reset" type="button" ${p.locked ? 'disabled' : ''}>Use default</button></div></form>
     <div class="ob-msg">${p.locked ? 'Fixed by a command-line option for this run.' : ''}</div>
     ${cands.map(c => `<button class="cand" data-p="${esc(c.path)}"><span>${esc(c.path)}</span><em>${c.files} file${c.files === 1 ? '' : 's'}</em></button>`).join('')}
+    ${answerRow(p)}
     <div class="ob-k">To start one</div><pre class="cmd">${esc(p.start)}</pre>
     <div class="note">${esc(p.note)}</div></div>`;
 }
@@ -109,9 +144,9 @@ async function refresh(force) {
   const needSetup = !r.demo && (r.state !== 'ok' || showSetup);
   if (needSetup && !setupData) setupData = await (await fetch('/api/setup')).json();
   if (!needSetup) setupData = null;
-  const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay])]);
+  const sig = JSON.stringify([r.state, showSetup, localStorage.dismissed, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay]), JSON.stringify(r.hooks || {})]);
   if (!force && sig === last) return; last = sig;
-  agents = r.agents; providers = r.providers;
+  agents = r.agents; providers = r.providers; hooksInfo = r.hooks || {};
   $('#onboard').hidden = !needSetup; $('#dash').hidden = needSetup;
   $('#banner').innerHTML = r.demo ? `<div class="banner demo"><b>DEMO</b> These are made-up sample agents, not your sessions. ${r.forced ? '' : '<button class="btn sm" id="exitdemo">Exit demo</button>'}</div>` : '';
   if ($('#exitdemo')) $('#exitdemo').onclick = () => { demoOn = false; sessionStorage.demo = '0'; last = ''; refresh(true); };
@@ -124,4 +159,7 @@ async function refresh(force) {
   $('#spendp').innerHTML = providers.map(p => { const v = sum(a => a.provider, agents)[p.id]; return v ? row(p.name, v) : ''; }).join('') || '<div class="empty">No spend yet.</div>';
   $('#spend').innerHTML = Object.entries(sum(a => a.project, agents)).sort((a, b) => b[1].cost - a[1].cost).map(([n, v]) => row(n, v)).join('') || '<div class="empty">No spend yet.</div>';
 }
+let psig = '';
+async function pollPrompts() { if (demoOn) { if (prompts.length) { prompts = []; psig = ''; draw(); } return; } try { const r = await (await fetch('/api/prompts')).json(); const sg = JSON.stringify(r.prompts.map(p => p.id)); prompts = r.prompts; if (sg !== psig) { psig = sg; if (!$('#dash').hidden) { draw(); document.querySelectorAll('[data-pid]').forEach(e => paintSel(e.dataset.pid)); } } } catch {} }
+setInterval(pollPrompts, 1500); pollPrompts();
 refresh().catch(() => {}); setInterval(() => { if (!document.activeElement || document.activeElement.tagName !== 'INPUT') refresh().catch(() => {}); }, 5000);
