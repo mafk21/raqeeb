@@ -27,6 +27,7 @@ window.copyCd = (id, btn) => { const a = agents.find(x => x.id === id); if (!a) 
 const where = a => a.cwd && a.cwd.startsWith('/') ? a.cwd : '';
 const hint = a => {
   const h = hooksInfo[a.provider] || {}, name = esc(provOf(a).name);
+  if (h.mode === 'wrap') return `Answer in the terminal, or start ${name} with <code>${esc(h.install)}</code> to answer from here.`;
   if (h.supported && h.installed) return `Answer in the terminal. Dashboard answering is on for ${name}, but this question did not arrive through it (restart the session after setting it up).`;
   if (h.supported) return `Answer in the terminal, or <button class="link" onclick="openSetup()">set up answering from here</button> for ${name}.`;
   return `Answer in the terminal or app where this agent runs. Raqeeb cannot answer for ${name}: ${esc(h.why || 'not supported')}`;
@@ -37,7 +38,7 @@ window.pick = (pid, qi, oi, multi) => { const p = prompts.find(x => x.id === pid
 function paintSel(pid) { const p = prompts.find(x => x.id === pid); if (!p) return; const el = document.querySelector(`[data-pid="${pid}"]`); if (!el) return;
   p.questions.forEach((q, qi) => q.options.forEach((o, oi) => { const b = el.querySelector(`[data-o="${qi}-${oi}"]`); if (b) b.classList.toggle('on', ((sel[pid] || {})[qi] || []).includes(o.label)); }));
   const ok = p.questions.every((q, qi) => ((sel[pid] || {})[qi] || []).length); const send = el.querySelector('.send'); if (send) send.disabled = !ok; }
-window.answer = async (pid, action) => { const p = prompts.find(x => x.id === pid); if (!p) return; const body = { action };
+window.answer = async (pid, action, choice) => { const p = prompts.find(x => x.id === pid); if (!p) return; const body = { action }; if (choice) body.choice = choice;
   if (action === 'answer') { body.answers = {}; p.questions.forEach((q, qi) => { const v = (sel[pid] || {})[qi] || []; body.answers[q.question] = q.multiSelect ? v : v[0]; }); }
   const el = document.querySelector(`[data-pid="${pid}"] .need-n`); if (el) el.textContent = 'Sending...';
   const x = await post('/api/prompts/' + pid + '/answer', body);
@@ -47,6 +48,7 @@ function promptBody(a) {
   const p = a.prompt, pid = esc(p.id);
   if (p.kind === 'question') return `<div class="need-q">${esc(p.title)}</div>` + p.questions.map((q, qi) => `<div class="qq"><div class="qh">${q.header ? `<em>${esc(q.header)}</em>` : ''}${esc(q.question)}${q.multiSelect ? ' <small>(pick any)</small>' : ''}</div><div class="opts">${q.options.map((o, oi) => `<button class="opt" data-o="${qi}-${oi}" onclick="pick('${pid}',${qi},${oi},${q.multiSelect})"><b>${esc(o.label)}</b>${o.description ? `<span>${esc(o.description)}</span>` : ''}</button>`).join('')}</div></div>`).join('')
     + `<div class="need-a"><button class="btn sm pri send" disabled onclick="answer('${pid}','answer')">Send answer</button><button class="btn sm" onclick="answer('${pid}','terminal')">Answer in terminal instead</button></div>`;
+  if (p.kind === 'choice') return `<div class="need-q">${esc(p.title)}</div>${p.detail ? `<pre class="need-d">${esc(p.detail)}</pre>` : ''}<div class="need-a">${p.options.map((o, i) => `<button class="btn sm ${i === 0 ? 'pri' : ''}" onclick="answer('${pid}','choose','${esc(o.key)}')">${esc(o.label)}</button>`).join('')}<button class="btn sm ghost" onclick="answer('${pid}','terminal')">Answer in terminal instead</button></div>`;
   return `<div class="need-q">${esc(p.title)}</div>${p.detail ? `<pre class="need-d">${esc(p.detail)}</pre>` : ''}${p.reason ? `<div class="need-t">${esc(p.reason)}</div>` : ''}
     <div class="need-a"><button class="btn sm pri" onclick="answer('${pid}','allow')">Approve</button><button class="btn sm" onclick="answer('${pid}','deny')">Deny</button><button class="btn sm ghost" onclick="answer('${pid}','terminal')">Answer in terminal instead</button></div>`;
 }
@@ -64,9 +66,9 @@ function row(a) {
 }
 function draw() {
   const d = dis(), inView = a => pfilter === 'all' || a.provider === pfilter;
-  const pFor = a => prompts.find(p => a.id === p.tool + ':' + p.sessionId);
+  const pFor = a => prompts.find(p => a.id === p.tool + ':' + p.sessionId || (p.tool === 'aider' && a.provider === 'aider' && p.cwd && a.cwd === p.cwd));
   const real = agents.filter(a => (a.status === 'waiting' || pFor(a)) && inView(a)).map(a => ({ ...a, prompt: pFor(a), agentReal: true }));
-  const lone = prompts.filter(p => !agents.some(a => a.id === p.tool + ':' + p.sessionId) && (pfilter === 'all' || p.tool === pfilter)).map(p => ({ id: 'prompt:' + p.id, provider: p.tool, tool: p.tool, project: (p.cwd.split('/').filter(Boolean).pop() || 'unknown folder'), branch: '', cwd: p.cwd, task: '', question: p.title, updated: p.created, status: 'waiting', prompt: p, agentReal: false }));
+  const lone = prompts.filter(p => !agents.some(a => pFor(a) === p) && (pfilter === 'all' || p.tool === pfilter)).map(p => ({ id: 'prompt:' + p.id, provider: p.tool, tool: p.tool, project: (p.cwd.split('/').filter(Boolean).pop() || 'unknown folder'), branch: '', cwd: p.cwd, task: '', question: p.title, updated: p.created, status: 'waiting', prompt: p, agentReal: false }));
   const asks = [...real, ...lone].sort((x, y) => (!!y.prompt - !!x.prompt) || x.updated - y.updated);
   const hidden = asks.filter(a => !a.prompt && d[a.id] === a.updated), shown = asks.filter(a => a.prompt || d[a.id] !== a.updated);
   $('#needn').textContent = shown.length ? shown.length : '';
@@ -98,7 +100,7 @@ const rerun = async () => { setupData = null; last = ''; await refresh(true); };
 function answerRow(p) {
   const h = ((setupData && setupData.hooks) || hooksInfo)[p.id]; if (!h) return '';
   if (!h.supported) return `<div class="ob-k">Answer from Raqeeb</div><div class="ans no"><b>Not supported.</b> ${esc(h.why)}</div>`;
-  return `<div class="ob-k">Answer from Raqeeb</div><div class="ans ${h.installed ? 'yes' : ''}"><b>${h.installed ? 'Set up.' : 'Available.'}</b> ${esc(h.does)}${h.installed ? '' : ' To turn it on, run:'}</div>${h.installed ? '' : `<pre class="cmd">${esc(h.install)}</pre>`}<div class="note">${esc(h.after)} Backup of your settings is kept next to the file (${esc(h.file)}). Untested against a real install.</div>`;
+  return `<div class="ob-k">Answer from Raqeeb</div><div class="ans ${h.installed ? 'yes' : ''}"><b>${h.mode === 'wrap' ? 'Available through a wrapper.' : h.installed ? 'Set up.' : 'Available.'}</b> ${esc(h.does)}${h.installed ? '' : h.mode === 'wrap' ? ' Start it like this:' : ' To turn it on, run:'}</div>${h.installed ? '' : `<pre class="cmd">${esc(h.install)}</pre>`}<div class="note">${esc(h.after)} ${h.file ? 'Backup of your settings is kept next to the file (' + esc(h.file) + '). Untested against a real install.' : ''}</div>`;
 }
 function provCard(p) {
   const info = p.info, found = info.exists && info.isDir;

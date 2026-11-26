@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0
+- Aider can be answered from the dashboard: start it with `raqeeb wrap aider`. A small Python wrapper (standard library only) runs Aider in a pseudo-terminal, shows its `(Y)es/(N)o` confirmations as cards with the real options, and types your click. Tested against a real Aider 0.86.2 and with a fake agent in the test suite.
+- Re-checked Cursor, Gemini CLI and Cline. They stay terminal-only, and the Setup screen and cards now give each tool's specific reason.
+
 ## 0.7.0
 - Answer from the dashboard for Claude Code (approve or deny, plus multiple-choice questions) and Codex CLI (approve or deny), through each tool's `PermissionRequest` hook. Turn on with `raqeeb hooks install claude|codex`.
 - Question cards show the real command or file, option buttons, and an "Answer in terminal instead" button. If you answer in the terminal, the card goes away.

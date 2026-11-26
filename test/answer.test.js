@@ -101,6 +101,26 @@ test('hooks install: merges into existing settings, keeps a backup, is idempoten
   assert.equal(hooks.uninstall('claude').changed, true);
   j = JSON.parse(fs.readFileSync(f, 'utf8')); assert.equal(j.hooks.PermissionRequest.length, 1); assert.equal(j.hooks.PermissionRequest[0].hooks[0].command, 'mine.sh');
   fs.writeFileSync(f, '{ not json'); assert.throws(() => hooks.install('claude')); assert.equal(fs.readFileSync(f, 'utf8'), '{ not json', 'invalid file left untouched');
-  assert.equal(hooks.status('gemini').supported, false); assert.match(hooks.status('cursor').why, /every shell command/);
+  assert.equal(hooks.status('gemini').supported, false); assert.match(hooks.status('cursor').why, /every shell command/); assert.equal(hooks.status('aider').mode, 'wrap'); assert.match(hooks.status('cline').why, /companion/);
   delete process.env.CLAUDE_CONFIG_DIR;
+});
+
+test('wrap.py: a dashboard click types the key into the agent; typing in the terminal cancels the card', async () => {
+  const t = await start(); const bin = h.tmp('fakebin-'); const fake = path.join(bin, 'aider');
+  fs.writeFileSync(fake, "#!/usr/bin/env python3\nimport sys\nprint('> /run make')\nprint('Run it now? (Y)es/(N)o/(A)ll [Yes]: ', end='', flush=True)\nl = sys.stdin.readline().strip()\nprint('GOT:' + l, flush=True)\nprint('Add output? (Y)es/(N)o [Yes]: ', end='', flush=True)\nl = sys.stdin.readline().strip()\nprint('GOT2:' + l, flush=True)\n", { mode: 0o755 });
+  const c = spawn('python3', [path.join(__dirname, '..', 'wrap.py'), 'aider'], { env: { ...process.env, RAQEEB_HOME: t.home, PATH: bin + ':' + process.env.PATH } });
+  let out = ''; c.stdout.on('data', d => out += d); c.stdin.write('');
+  const poll = setInterval(() => view(t.port).catch(() => {}), 1000); await view(t.port);
+  const waitFor = async f => { for (let i = 0; i < 60; i++) { const l = JSON.parse((await view(t.port)).body).prompts; const r = f(l); if (r) return r; await sleep(200); } return null; };
+  const p1 = await waitFor(l => l[0]); assert.ok(p1, 'card appeared');
+  assert.equal(p1.kind, 'choice'); assert.equal(p1.tool, 'aider'); assert.match(p1.title, /Run it now\?/); assert.deepEqual(p1.options.map(o => o.key), ['y', 'n', 'a']); assert.match(p1.detail, /\/run make/);
+  assert.equal((await dash(t.port, `/api/prompts/${p1.id}/answer`, { action: 'choose', choice: 'x' })).code, 400, 'only offered keys');
+  assert.equal((await dash(t.port, `/api/prompts/${p1.id}/answer`, { action: 'allow' })).code, 400);
+  assert.equal((await dash(t.port, `/api/prompts/${p1.id}/answer`, { action: 'choose', choice: 'a' })).code, 200);
+  for (let i = 0; i < 40 && !/GOT:a/.test(out); i++) await sleep(200); assert.match(out, /GOT:a/);
+  const p2 = await waitFor(l => l.find(x => x.id !== p1.id)); assert.ok(p2, 'second prompt');
+  c.stdin.write('n\n');   // the user types in the terminal instead
+  for (let i = 0; i < 40 && !/GOT2:n/.test(out); i++) await sleep(200); assert.match(out, /GOT2:n/);
+  assert.equal(JSON.parse((await view(t.port)).body).prompts.length, 0, 'card cleared after typing in the terminal');
+  clearInterval(poll); c.kill(); t.close();
 });

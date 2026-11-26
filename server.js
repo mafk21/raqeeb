@@ -25,6 +25,7 @@ function parseArgs(argv) {
 const HELP = `Raqeeb ${pkg.version}: a local control room for your AI coding agents
 
 Usage: raqeeb [options]
+       raqeeb wrap aider [aider args]                          run Aider so the dashboard can answer its (Y)es/(N)o prompts
        raqeeb hooks <print|install|uninstall> <claude|codex>   let the dashboard answer that tool
 
   --demo           start in demo mode with sample data (otherwise Raqeeb never shows sample data unless you click "Try demo")
@@ -88,7 +89,7 @@ function createServer(opts) {
       const tok = String(req.headers['x-raqeeb-token'] || '');
       if (req.headers.origin || !hookToken || tok.length !== hookToken.length || !crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(hookToken))) return json(res, 403, { error: 'Forbidden' });
       return readBody(req, (e, b) => {
-        if (e || !['claude', 'codex'].includes(b.tool) || !b.payload || typeof b.payload !== 'object') return json(res, 400, { error: 'Bad request' });
+        if (e || !['claude', 'codex', 'aider'].includes(b.tool) || !b.payload || typeof b.payload !== 'object') return json(res, 400, { error: 'Bad request' });
         // Nobody is looking at the dashboard: do not hold the agent up, let its own prompt show.
         if (!prompts.viewerActive()) return json(res, 200, { decision: null, reason: 'no-viewer' });
         const item = prompts.create(b.tool, b.payload);
@@ -128,6 +129,11 @@ function createServer(opts) {
   return srv;
 }
 
+if (require.main === module && process.argv[2] === 'wrap') {
+  const r = require('child_process').spawnSync('python3', [path.join(__dirname, 'wrap.py'), ...process.argv.slice(3)], { stdio: 'inherit' });
+  if (r.error) { console.error('The wrapper needs python3 (standard library only): ' + r.error.message); process.exit(1); }
+  process.exit(r.status == null ? 1 : r.status);
+}
 if (require.main === module && process.argv[2] === 'hooks') {
   const [, , , act, tool] = process.argv, ok = ['print', 'install', 'uninstall', 'status'];
   if (!ok.includes(act) || (act !== 'status' && !hooks.SUPPORT[tool])) {
