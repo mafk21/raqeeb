@@ -1,6 +1,6 @@
 {
   "name": "raqeeb",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "One local control room for all your AI coding agents: Claude Code, Codex CLI, Cursor, Gemini CLI, Aider and Cline. See what each is working on, what it is asking you, and what it costs.",
   "bin": { "raqeeb": "server.js" },
   "main": "server.js",

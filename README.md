@@ -6,12 +6,12 @@ Raqeeb means "watcher" in Arabic. If you run more than one agent at once, often 
 
 ![Raqeeb dashboard, light mode](docs/dashboard-light.png)
 
-![Claude Code, Codex CLI and Cursor on one board, from sample session files](docs/dashboard-providers.png)
+![When nothing is waiting: working agents below, tool filters on the right](docs/dashboard-calm.png)
 
 ## What you get
 
 - **One board for every agent, from every tool.** Six tools side by side. Each card has a tool badge, project, branch, task, last message and a status: working, idle, waiting on you, or done. Filter by tool.
-- **An inbox of open questions.** When an agent ends its turn with a question, it shows up in "Needs your answer" so you can find it fast.
+- **An inbox of open questions.** When an agent ends its turn with a question, it shows up at the top under "Needs you", longest-waiting first.
 - **Spend per tool and per project.** An estimate where a price is known (Claude Code), and token counts only where it is not. Raqeeb never invents a price.
 - **Light and dark mode**, and a layout that works on a phone-sized window.
 - **Local only.** Reads files already on your disk. No account, no telemetry, nothing uploaded. The server listens on `127.0.0.1`, so other machines cannot reach it.
@@ -63,8 +63,8 @@ Just want to look around? Press **Try demo with sample data** on that screen, or
 
 1. Start Raqeeb and leave it open in a browser tab.
 2. Use your agents as you normally do, in as many terminals and tools as you like. Sessions show up on their own.
-3. Watch the **Needs your answer** list. Click an agent card to see its task, last message, token usage and working folder.
-4. Use the tool chips (All, Claude Code, Codex CLI, Cursor) and the status filter (All, Working, Waiting, Done) to focus.
+3. Questions come first. Any agent that stopped to ask something appears at the top under **Needs you**, longest-waiting first, with its tool, project, the question, and how long it has waited. Press **Details** for the full context, **Copy folder** for a `cd` command to the project, or **Dismiss** to hide it until that agent says something new. Raqeeb cannot answer for you yet. Go to the terminal or app where the agent runs.
+4. Everything else is listed below as one line per agent (working, then finished). Use the tool chips to focus on one tool. Spend, tool status and per-project cost are under **Usage and tools**. The browser tab title shows how many agents need you, for example `(2) Raqeeb`.
 
 If Raqeeb finds no session from the last 24 hours in any tool it shows the setup screen, not sample data.
 

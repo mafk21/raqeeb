@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+- Question-first dashboard. The top of the page says how many agents need you, then lists each question with the tool, project, task and how long it has waited. Details, Copy folder and Dismiss on each (dismissed until the agent says something new).
+- Everything else is one line per agent, grouped Working and Finished. Usage, tool status and spend moved into a collapsed "Usage and tools" section.
+- Calm empty state when nothing is waiting. Tab title shows the waiting count.
+- Site: headline and copy lead with questions, and the demo is labelled simulated.
+
 ## 0.5.0
 - Three more tools: Gemini CLI, Aider and Cline, each its own adapter, all experimental (written from published format notes, tested with fixture files only).
 - Setup screen has a panel for each; new flags `--gemini-dir`, `--aider-dir`, `--cline-dir`.
