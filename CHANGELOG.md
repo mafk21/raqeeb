@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.1
+- License changed from MIT to PolyForm Noncommercial 1.0.0: free for non-commercial use, no commercial use without permission. Raqeeb is now described as source-available, not open source. Copies obtained under MIT before this change keep MIT.
+
 ## 0.8.0
 - Aider can be answered from the dashboard: start it with `raqeeb wrap aider`. A small Python wrapper (standard library only) runs Aider in a pseudo-terminal, shows its `(Y)es/(N)o` confirmations as cards with the real options, and types your click. Tested against a real Aider 0.86.2 and with a fake agent in the test suite.
 - Re-checked Cursor, Gemini CLI and Cline. They stay terminal-only, and the Setup screen and cards now give each tool's specific reason.

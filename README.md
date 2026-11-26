@@ -168,7 +168,7 @@ Sessions untouched for 24 hours are hidden.
 
 ## Roadmap: Raqeeb Pro (not built yet)
 
-The free app stays free and open source. A paid layer is planned for people who run agents all day:
+The app stays free for non-commercial use. A paid layer is planned for people who run agents all day:
 
 - Approve or redirect an agent from your phone
 - Limits on which files and commands an agent may touch
@@ -198,7 +198,7 @@ test/             automated tests
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Good first things: an adapter for another coding agent (it is one file), better status detection, and real-session bug reports.
+Issues and pull requests are welcome. By sending a pull request you agree that your contribution can be distributed under the same license. See [CONTRIBUTING.md](CONTRIBUTING.md). Good first things: an adapter for another coding agent (it is one file), better status detection, and real-session bug reports.
 
 ## Privacy and security
 
@@ -206,4 +206,4 @@ Raqeeb never sends data anywhere. It reads local files and serves a page on `127
 
 ## License
 
-[MIT](LICENSE)
+Raqeeb is source-available, not open source. It is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You can use, read and change it for personal, hobby, research, educational and other non-commercial purposes, free. You may not use it for any commercial purpose (for example, inside a paid product or service, or at a company for its business) without separate permission from the author. Versions published before 0.8.1 were released under the MIT license, and copies already obtained under MIT keep that license.
