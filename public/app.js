@@ -1,84 +1,101 @@
 const $ = s => document.querySelector(s), root = document.documentElement;
 root.dataset.theme = (location.hash == '#dark' ? 'dark' : null) || localStorage.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 $('#theme').onclick = () => { root.dataset.theme = localStorage.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'; };
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const mono = s => `<code>${esc(s)}</code>`;
 const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
-const cost = a => a.cost != null ? a.cost : (a.tokensIn * 3 + a.tokensOut * 15) / 1e6;
-let agents = [], filter = 'all', last = '', animate = true;
+const money = c => c == null ? null : '~$' + c.toFixed(2);
+const tok = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n);
+const costText = a => a.cost != null ? money(a.cost) : a.hasUsage ? tok(a.tokensIn + a.tokensOut) + ' tokens' : 'no usage data';
+let agents = [], providers = [], filter = 'all', pfilter = 'all', last = '', animate = true, demoOn = sessionStorage.demo === '1', showSetup = false, setupData = null;
 const bucket = a => a.status === 'idle' ? 'working' : a.status;
+const badge = p => `<span class="tag t-${esc(p.id || p.provider)}">${esc(p.name || p.tool)}${p.experimental ? '<i title="Experimental: built from published format notes, not yet checked against a real install">beta</i>' : ''}</span>`;
+const provOf = a => providers.find(p => p.id === a.provider) || { id: a.provider, name: a.tool };
+
 document.querySelectorAll('#seg button').forEach(b => b.onclick = () => { filter = b.dataset.f; document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('on', x === b)); draw(); });
 $('#drawer').onclick = e => { if (e.target.id === 'drawer') $('#drawer').classList.remove('open'); };
-function open(id) { const a = agents.find(x => x.id === id); if (!a) return;
-  $('#panel').innerHTML = `<h3>${esc(a.project)}</h3><div class="meta">${esc(a.tool)} · ${esc(a.branch || 'no branch')} · ${esc(a.model || '')}</div><span class="pill" style="display:inline-block">${a.status}</span>
+window.open_ = id => { const a = agents.find(x => x.id === id); if (!a) return;
+  $('#panel').innerHTML = `<h3>${esc(a.project)}</h3><div class="meta">${badge(provOf(a))} ${esc(a.branch || 'no branch')} ${a.model ? '· ' + esc(a.model) : ''}</div><span class="pill" style="display:inline-block">${a.status}</span>
   <div class="k">Task</div><pre>${esc(a.task)}</pre><div class="k">Last message</div><pre>${esc(a.lastSay)}</pre>${a.question ? `<div class="k">Waiting on you</div><pre>${esc(a.question)}</pre>` : ''}
-  <div class="k">Usage</div><pre>${a.tokensIn.toLocaleString()} tokens in, ${a.tokensOut.toLocaleString()} out\nEstimated cost ~$${cost(a).toFixed(2)}\nWorking directory: ${esc(a.cwd)}</pre><p><button class="btn" onclick="document.getElementById('drawer').classList.remove('open')">Close</button></p>`;
-  $('#drawer').classList.add('open'); }
+  <div class="k">Usage</div><pre>${a.hasUsage ? `${a.tokensIn.toLocaleString()} tokens in, ${a.tokensOut.toLocaleString()} out\n` : 'This tool does not record token usage in the files Raqeeb reads.\n'}${a.cost != null ? 'Estimated cost ' + money(a.cost) : a.hasUsage ? 'No price rate set for this model (edit lib/pricing.js)' : ''}\nWorking directory: ${esc(a.cwd)}</pre><p><button class="btn" onclick="document.getElementById('drawer').classList.remove('open')">Close</button></p>`;
+  $('#drawer').classList.add('open'); };
+
 function draw() {
-  const list = agents.filter(a => filter === 'all' || bucket(a) === filter);
-  $('#board').innerHTML = list.map((a, i) => `<div class="card ${a.status}" style="${animate ? `animation:up .5s ${i * 50}ms both` : 'animation:none'}" onclick="open_('${a.id}')"><div class="row"><span class="proj">${esc(a.project)}</span><span class="pill">${a.status}</span></div>
-  <div class="meta">${esc(a.tool)} · ${esc(a.branch || 'no branch')}</div><div class="task">${esc(a.task)}</div><div class="say">${esc(a.lastSay)}</div>
-  <div class="foot"><span>${ago(a.updated)}</span><span>~$${cost(a).toFixed(2)}</span></div></div>`).join('') || '<div class="empty">No agents in this view.</div>';
+  const list = agents.filter(a => (filter === 'all' || bucket(a) === filter) && (pfilter === 'all' || a.provider === pfilter));
+  $('#board').innerHTML = list.map((a, i) => `<div class="card ${a.status}" style="${animate ? `animation:up .5s ${i * 50}ms both` : 'animation:none'}" onclick="open_('${esc(a.id)}')"><div class="row"><span class="proj">${esc(a.project)}</span><span class="pill">${a.status}</span></div>
+  <div class="meta">${badge(provOf(a))} ${esc(a.branch || '')}</div><div class="task">${esc(a.task)}</div><div class="say">${esc(a.lastSay)}</div>
+  <div class="foot"><span>${ago(a.updated)}</span><span>${costText(a)}</span></div></div>`).join('') || `<div class="empty">${pfilter === 'all' ? 'No agents in this view.' : 'No ' + esc((providers.find(p => p.id === pfilter) || {}).name) + ' sessions in this view.'}</div>`;
 }
-window.open_ = open;
-let demoOn = sessionStorage.demo === '1', showSetup = false, setupData = null;
-const mono = s => `<code>${esc(s)}</code>`;
+function drawProviderFilter() {
+  const items = [['all', 'All', agents.length], ...providers.map(p => [p.id, p.name, agents.filter(a => a.provider === p.id).length])];
+  $('#pseg').innerHTML = items.map(([id, n, c]) => `<button data-p="${esc(id)}" class="${pfilter === id ? 'on' : ''}">${esc(n)} <small>${c}</small></button>`).join('');
+  document.querySelectorAll('#pseg button').forEach(b => b.onclick = () => { pfilter = b.dataset.p; drawProviderFilter(); draw(); });
+}
+const provLine = p => p.state === 'demo' ? `${p.count} sample` : p.state === 'ok' ? `${p.count} active in the last 24 h` : p.state === 'no-sessions' ? `no sessions in 24 h (${p.info.files} older)` : 'folder not found';
+
 async function post(url, body) { const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return { ok: r.ok, body: await r.json() }; }
+const rerun = async () => { setupData = null; last = ''; await refresh(true); };
+
+function provCard(p) {
+  const info = p.info, found = info.exists && info.isDir;
+  const cls = p.state === 'ok' ? 'good' : p.state === 'no-sessions' ? 'warn' : 'bad';
+  const msg = p.state === 'ok' ? `Found ${p.count} active session${p.count === 1 ? '' : 's'} (${info.files} files in all).`
+    : p.state === 'no-sessions' ? `Folder found with ${info.files} older session file${info.files === 1 ? '' : 's'}, none in the last 24 hours.`
+    : `No folder at ${mono(p.root)}.`;
+  const cands = (p.candidates || []).filter(c => c.exists && c.isDir && c.path !== p.root);
+  return `<div class="ob-step prov" data-id="${esc(p.id)}"><div class="prov-h">${badge(p)}<span class="st ${cls}">${p.state === 'ok' ? 'Detected' : p.state === 'no-sessions' ? 'Nothing recent' : 'Not found'}</span></div>
+    <p>${msg}</p>
+    <form class="dirform"><input value="${esc(p.root)}" spellcheck="false" aria-label="${esc(p.name)} folder" ${p.locked ? 'readonly' : ''}><div class="ob-row"><button class="btn sm pri" type="submit" ${p.locked ? 'disabled' : ''}>Save and scan</button><button class="btn sm reset" type="button" ${p.locked ? 'disabled' : ''}>Use default</button></div></form>
+    <div class="ob-msg">${p.locked ? 'Fixed by a command-line option for this run.' : ''}</div>
+    ${cands.map(c => `<button class="cand" data-p="${esc(c.path)}"><span>${esc(c.path)}</span><em>${c.files} file${c.files === 1 ? '' : 's'}</em></button>`).join('')}
+    <div class="ob-k">To start one</div><pre class="cmd">${esc(p.start)}</pre>
+    <div class="note">${esc(p.note)}</div></div>`;
+}
 
 function onboard(r, setup) {
-  const info = (setup && setup.info) || r.info || {}, root = (setup && setup.root) || r.root || '';
-  const found = info.exists && info.isDir, hasOld = found && info.files > 0;
-  const cands = (setup ? setup.candidates : []).filter(c => c.exists && c.isDir);
-  const ok = r.state === 'ok';
-  const headline = ok ? 'Sessions folder' : !found ? 'Raqeeb could not find your Claude Code sessions'
-    : hasOld ? 'No Claude Code sessions in the last 24 hours' : 'No Claude Code sessions found yet';
-  const detail = ok ? `Raqeeb is reading ${info.recent} recent session${info.recent === 1 ? '' : 's'} (of ${info.files}) from ${mono(root)}.` : !found ? `There is no folder at ${mono(root)}.`
-    : hasOld ? `The folder ${mono(root)} has ${info.files} older session file${info.files === 1 ? '' : 's'}, but none were touched in the last 24 hours.`
-    : `The folder ${mono(root)} exists but has no session files in it yet.`;
-  const first = !setup || !setup.configured;
-  $('#onboard').innerHTML = `<div class="ob">
-    <div class="ob-head"><span class="ob-tag">${ok ? 'Setup' : found ? 'Nothing to show yet' : 'First run'}</span><h1>${headline}</h1><p>${detail} ${ok ? '' : 'No sample data is shown. '}Everything on this page comes from your own session files.</p></div>
-    <div class="ob-grid">
-      <div class="ob-step"><b>1</b><h3>Confirm the sessions folder</h3>
-        <p>Claude Code writes one log file per session. Raqeeb reads them, read-only, from this folder:</p>
-        <form id="dirform"><input id="dirin" value="${esc(root)}" spellcheck="false" aria-label="Claude Code projects folder"><div class="ob-row"><button class="btn pri" type="submit">Save and scan</button><button class="btn" type="button" id="resetdir">Use default</button></div></form>
-        <div id="dirmsg" class="ob-msg">${setup && setup.locked ? 'This run was started with --dir, so the folder is fixed.' : ''}</div>
-        ${cands.length ? `<div class="ob-k">Folders found on this computer</div>${cands.map(c => `<button class="cand" data-p="${esc(c.path)}"><span>${esc(c.path)}</span><em>${c.files} session file${c.files === 1 ? '' : 's'}</em></button>`).join('')}` : `<div class="ob-k">No Claude Code folder was found in the usual places. If you use Claude Code, run it once in a project, then press Re-scan.</div>`}
-      </div>
-      <div class="ob-step"><b>2</b><h3>Start a Claude Code session</h3>
-        <p>Open a terminal in any project and start Claude Code:</p><pre class="cmd">cd your-project\nclaude</pre>
-        <p>Send it a message. Within a few seconds its session shows up here. Leave this page open, it refreshes on its own.</p></div>
-      <div class="ob-step"><b>3</b><h3>Check again</h3>
-        <p>Once a session exists, press the button. Or just wait, Raqeeb re-scans every 5 seconds.</p>
-        <button class="btn pri" id="rescan">Re-scan now</button><div id="scanmsg" class="ob-msg"></div>
-        <div class="ob-k">Just want to look around?</div><button class="btn" id="trydemo">Try demo with sample data</button></div>
-    </div></div>`;
-  $('#dirform').onsubmit = async e => { e.preventDefault(); const m = $('#dirmsg'); m.textContent = 'Checking...'; const x = await post('/api/setup', { dir: $('#dirin').value }); m.textContent = x.ok ? '' : x.body.error; if (x.ok) { setupData = null; last = ''; await refresh(true); } };
-  $('#resetdir').onclick = async () => { await post('/api/setup', { dir: '' }); setupData = null; last = ''; await refresh(true); };
-  document.querySelectorAll('.cand').forEach(b => b.onclick = async () => { await post('/api/setup', { dir: b.dataset.p }); setupData = null; last = ''; await refresh(true); });
-  $('#rescan').onclick = async () => { $('#scanmsg').textContent = 'Scanning...'; last = ''; await refresh(true); const n = $('#scanmsg'); if (n) n.textContent = 'Scanned just now. Still nothing found.'; };
+  const ps = setup.providers, any = ps.some(p => p.state === 'ok'), found = ps.filter(p => p.info.exists);
+  const headline = any ? 'Setup' : found.length ? 'No agent sessions in the last 24 hours' : 'Raqeeb could not find any agent sessions';
+  const detail = any ? 'These are the tools Raqeeb checks and where it looks. Change a folder if yours lives somewhere else.'
+    : found.length ? 'Raqeeb found at least one tool folder, but no session was touched in the last 24 hours.' : 'None of the supported tools has a session folder at the usual place on this computer.';
+  $('#onboard').innerHTML = `<div class="ob"><div class="ob-head"><span class="ob-tag">${any ? 'Setup' : found.length ? 'Nothing to show yet' : 'First run'}</span><h1>${headline}</h1>
+    <p>${detail} ${any ? '' : 'No sample data is shown. '}Everything on this page comes from your own session files, read-only.</p></div>
+    <div class="ob-grid3">${ps.map(provCard).join('')}</div>
+    <div class="ob-foot"><div><b>Next:</b> start a session in any of these tools, then press <button class="btn sm pri" id="rescan">Re-scan now</button> or wait, Raqeeb re-scans every 5 seconds. <span id="scanmsg" class="ob-msg"></span></div>
+    <div>Just want to look around? <button class="btn sm" id="trydemo">Try demo with sample data</button></div></div></div>`;
+  document.querySelectorAll('.prov').forEach(el => {
+    const id = el.dataset.id;
+    el.querySelector('.dirform').onsubmit = async e => { e.preventDefault(); const m = el.querySelector('.ob-msg'); m.textContent = 'Checking...'; const x = await post('/api/setup', { provider: id, dir: el.querySelector('input').value }); m.textContent = x.ok ? '' : x.body.error; if (x.ok) await rerun(); };
+    el.querySelector('.reset').onclick = async () => { await post('/api/setup', { provider: id, dir: '' }); await rerun(); };
+    el.querySelectorAll('.cand').forEach(b => b.onclick = async () => { await post('/api/setup', { provider: id, dir: b.dataset.p }); await rerun(); });
+  });
+  $('#rescan').onclick = async () => { $('#scanmsg').textContent = 'Scanning...'; last = ''; await refresh(true); const n = $('#scanmsg'); if (n) n.textContent = 'Scanned just now.'; };
   $('#trydemo').onclick = () => { demoOn = true; sessionStorage.demo = '1'; last = ''; refresh(true); };
 }
 $('#setupbtn').onclick = () => { showSetup = !showSetup; last = ''; refresh(true); };
 
 async function refresh(force) {
   const r = await (await fetch('/api/agents' + (demoOn ? '?demo=1' : ''))).json();
-  const explicitDemo = r.demo;
-  const needSetup = !explicitDemo && (r.state !== 'ok' || showSetup);
+  const needSetup = !r.demo && (r.state !== 'ok' || showSetup);
   if (needSetup && !setupData) setupData = await (await fetch('/api/setup')).json();
   if (!needSetup) setupData = null;
-  const sig = JSON.stringify([r.state, showSetup, r.root, r.info, r.agents.map(a => [a.id, a.status, a.updated, a.lastSay])]);
+  const sig = JSON.stringify([r.state, showSetup, r.providers.map(p => [p.id, p.root, p.state, p.count]), r.agents.map(a => [a.id, a.status, a.updated, a.lastSay])]);
   if (!force && sig === last) return; last = sig;
+  agents = r.agents; providers = r.providers;
   $('#onboard').hidden = !needSetup; $('#dash').hidden = needSetup;
-  $('#banner').innerHTML = explicitDemo ? `<div class="banner demo"><b>DEMO</b> These are made-up sample agents, not your sessions. ${r.forced ? '' : '<button class="btn sm" id="exitdemo">Exit demo</button>'}</div>` : '';
+  $('#banner').innerHTML = r.demo ? `<div class="banner demo"><b>DEMO</b> These are made-up sample agents, not your sessions. ${r.forced ? '' : '<button class="btn sm" id="exitdemo">Exit demo</button>'}</div>` : '';
   if ($('#exitdemo')) $('#exitdemo').onclick = () => { demoOn = false; sessionStorage.demo = '0'; last = ''; refresh(true); };
-  if (needSetup) { onboard(r, setupData && { ...setupData, configured: !!setupData.root }); return; }
-  agents = r.agents;
+  if (needSetup) return onboard(r, setupData);
+  if (pfilter !== 'all' && !providers.some(p => p.id === pfilter)) pfilter = 'all';
   const c = s => agents.filter(a => a.status === s).length;
-  $('#stats').innerHTML = [['', c('working') + c('idle'), 'Working'], ['hot', c('waiting'), 'Waiting on you'], ['', c('done'), 'Done'], ['amb', '$' + agents.reduce((s, a) => s + cost(a), 0).toFixed(2), 'Est. spend']].map(([k, n, l]) => `<div class="kpi ${k}"><small>${l}</small><b>${n}</b></div>`).join('');
-  draw(); animate = false;
+  const known = agents.reduce((s, a) => s + (a.cost || 0), 0), unpriced = agents.filter(a => a.cost == null && a.hasUsage).length;
+  $('#stats').innerHTML = [['', c('working') + c('idle'), 'Working'], ['hot', c('waiting'), 'Waiting on you'], ['', c('done'), 'Done'], ['amb', '$' + known.toFixed(2), 'Est. spend' + (unpriced ? ' (+' + unpriced + ' unpriced)' : '')]].map(([k, n, l]) => `<div class="kpi ${k}"><small>${l}</small><b>${n}</b></div>`).join('');
+  drawProviderFilter(); draw(); animate = false;
   const qs = agents.filter(a => a.question);
-  $('#inbox').innerHTML = qs.length ? qs.map(a => `<div class="q"><small>${esc(a.project)} · ${ago(a.updated)}</small><div>${esc(a.question)}</div></div>`).join('') : '<div class="empty">No agent is waiting on you.</div>';
-  const byProj = {}; agents.forEach(a => byProj[a.project] = (byProj[a.project] || 0) + cost(a));
-  $('#spend').innerHTML = Object.entries(byProj).sort((a, b) => b[1] - a[1]).map(([p, c]) => `<div class="sp-row"><span>${esc(p)}</span><b>~$${c.toFixed(2)}</b></div>`).join('') || '<div class="empty">No spend yet.</div>';
+  $('#inbox').innerHTML = qs.length ? qs.map(a => `<div class="q"><small>${badge(provOf(a))} ${esc(a.project)} · ${ago(a.updated)}</small><div>${esc(a.question)}</div></div>`).join('') : '<div class="empty">No agent is waiting on you.</div>';
+  $('#provs').innerHTML = providers.map(p => `<div class="sp-row prow"><span>${badge(p)}</span><small class="${p.state === 'ok' || p.state === 'demo' ? '' : 'dim'}">${esc(provLine(p))}</small></div>`).join('') + (r.demo ? '' : '<div class="note">Not seeing a tool? Press <b>Setup</b> to check its folder.</div>');
+  const sum = (key, list) => { const o = {}; list.forEach(a => { const k = key(a); o[k] = o[k] || { cost: 0, tok: 0, priced: 0, n: 0 }; o[k].n++; o[k].tok += a.tokensIn + a.tokensOut; if (a.cost != null) { o[k].cost += a.cost; o[k].priced++; } }); return o; };
+  const row = (n, v) => `<div class="sp-row"><span>${esc(n)}</span><b>${v.priced ? '~$' + v.cost.toFixed(2) : v.tok ? tok(v.tok) + ' tokens' : 'no usage data'}</b></div>`;
+  $('#spendp').innerHTML = providers.map(p => { const v = sum(a => a.provider, agents)[p.id]; return v ? row(p.name, v) : ''; }).join('') || '<div class="empty">No spend yet.</div>';
+  $('#spend').innerHTML = Object.entries(sum(a => a.project, agents)).sort((a, b) => b[1].cost - a[1].cost).map(([n, v]) => row(n, v)).join('') || '<div class="empty">No spend yet.</div>';
 }
-refresh().catch(() => {}); setInterval(() => { if (!document.activeElement || document.activeElement.id !== 'dirin') refresh().catch(() => {}); }, 5000);
+refresh().catch(() => {}); setInterval(() => { if (!document.activeElement || document.activeElement.tagName !== 'INPUT') refresh().catch(() => {}); }, 5000);

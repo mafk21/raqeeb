@@ -21,9 +21,33 @@ npm run demo
 - Add or update a test in `test/` for any change in `lib/` or `server.js`.
 - Run `npm test` before you open a pull request.
 
-## Adding another agent
+## Adding an agent provider
 
-Session reading lives in `lib/sessions.js`. A new agent needs a parser that returns the same card shape (`id`, `tool`, `project`, `branch`, `task`, `lastSay`, `question`, `status`, `updated`, `tokensIn`, `tokensOut`, `cost`). Include a small sample log file in your test so the format is documented.
+Each tool is one file in `lib/providers/`. Copy `codex.js` (the closest to a typical JSON Lines log) and change it.
+
+1. Create `lib/providers/<id>.js` that exports this object:
+
+```js
+module.exports = {
+  id: 'mytool',                 // short, lowercase, used in URLs and config
+  name: 'My Tool',              // shown in the UI
+  experimental: true,           // true unless you checked it against a real install
+  start: 'mytool',              // command shown on the setup screen
+  note: 'Reads ~/.mytool/logs. ...', // one or two honest sentences
+  defaultRoot() {},             // default folder (string)
+  candidates() {},              // other folders worth suggesting (array of strings)
+  parse(file, stat) {},         // one log file -> card fields, or null to skip it
+  inspect(root, now) {},        // { exists, isDir, files, recent } for the setup screen
+  scan(root, now) {}            // recent cards, newest first
+};
+```
+
+2. `parse` returns: `id`, `project`, `cwd`, `branch`, `model`, `task`, `lastSay`, `updated` (ms), `tokensIn`, `tokensOut`, `turns`, `cost` and `hasUsage`. Use `cost: null` when you have no price rate. Never guess a price or token count. Leave fields empty (`''`, `0`) when the log does not have them.
+3. You rarely need to write `inspect` and `scan` yourself. Use the helpers in `lib/common.js`: `inspectFiles(root, depth, matchFn, now)`, `makeScanner({ depth, match, parse })` (adds status, caches parses by mtime and size, hides sessions older than 24 hours) and `readJsonl(file)` (skips bad lines).
+4. Register it in `lib/providers/index.js`.
+5. Put a comment at the top of the file with the log location and **links to the sources you based the format on**. If you did not test with a real install, keep `experimental: true`.
+6. Add fixture helpers and tests in `test/` (see `test/helpers.js` and `test/providers.test.js`). Fixtures should be small files that document the format you read. The UI, badges, filter chips, setup panel and spend panels pick the new provider up automatically. Add a colour for its badge in `public/style.css` (`.t-<id>`) if you want one.
+7. Add a row to the table in the README.
 
 ## Reporting bugs
 

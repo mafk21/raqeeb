@@ -1,16 +1,18 @@
 # Raqeeb (رقيب)
 
-**A local control room for the AI coding agents you run.**
+**One local control room for all your AI coding agents: Claude Code, Codex CLI and Cursor.**
 
-Raqeeb means "watcher" in Arabic. If you run several Claude Code sessions at once, you lose track of them: which one is still working, which one stopped to ask you something, and what the day is costing. Raqeeb puts all of that on one page, on your own machine.
+Raqeeb means "watcher" in Arabic. If you run more than one agent at once, often more than one kind, you lose track of them: which one is still working, which one stopped to ask you something, and what the day is costing. Raqeeb puts all of that on one page, on your own machine.
 
 ![Raqeeb dashboard, light mode](docs/dashboard-light.png)
 
+![Claude Code, Codex CLI and Cursor on one board, from sample session files](docs/dashboard-providers.png)
+
 ## What you get
 
-- **One board for every agent.** Project, branch, task, last message, and a status: working, idle, waiting on you, or done.
+- **One board for every agent, from every tool.** Claude Code, Codex CLI and Cursor side by side. Each card has a tool badge, project, branch, task, last message and a status: working, idle, waiting on you, or done. Filter by tool.
 - **An inbox of open questions.** When an agent ends its turn with a question, it shows up in "Needs your answer" so you can find it fast.
-- **Cost estimates.** Per agent and per project, from the token counts in the session logs.
+- **Spend per tool and per project.** An estimate where a price is known (Claude Code), and token counts only where it is not. Raqeeb never invents a price.
 - **Light and dark mode**, and a layout that works on a phone-sized window.
 - **Local only.** Reads files already on your disk. No account, no telemetry, nothing uploaded. The server listens on `127.0.0.1`, so other machines cannot reach it.
 - **Zero dependencies.** One small Node program. Nothing to install besides Node.
@@ -45,28 +47,26 @@ Then open **http://localhost:4317** in your browser. The page refreshes every 5 
 
 ### First run
 
-The first time you open Raqeeb it checks for your Claude Code sessions folder and tells you plainly what it found. If it cannot find any sessions it says so and shows a short setup screen. It never fills the page with made-up data.
+The first time you open Raqeeb it checks the usual folder of each supported tool and tells you plainly what it found, tool by tool. If it cannot find any sessions it says so and shows a setup screen with one panel per tool. It never fills the page with made-up data.
 
 ![First-run screen](docs/first-run.png)
 
-1. **Confirm the sessions folder.** Raqeeb shows where it looked (by default `~/.claude/projects`) and lists any Claude Code folders it finds on your computer. Type a different path and press **Save and scan** if yours lives elsewhere. Raqeeb remembers it in `~/.raqeeb/config.json`.
-2. **Start a Claude Code session.** Run `claude` in any project and send a message.
+1. **Check each tool's panel.** It says Detected, Nothing recent or Not found, shows where Raqeeb looked, and lists other folders it finds. Type a different path and press **Save and scan** if yours lives elsewhere. Raqeeb remembers it in `~/.raqeeb/config.json`. You only need one tool to have sessions.
+2. **Start a session** in any of them (the panel shows the command).
 3. **Re-scan.** Press the button, or wait, the page checks every 5 seconds.
 
-If the folder exists but nothing was touched in the last 24 hours, you get a "No Claude Code sessions found" screen that says how many older session files are there.
-
-![Empty state](docs/no-sessions.png)
+If a tool has no recent sessions it keeps its own empty state, and the dashboard shows a per-tool status strip so you can see which tools Raqeeb is reading.
 
 Just want to look around? Press **Try demo with sample data** on that screen, or run `node server.js --demo`. Demo data is always marked with a red "DEMO" banner. You can reopen the setup screen any time with the **Setup** button in the top bar.
 
 ## Using it
 
 1. Start Raqeeb and leave it open in a browser tab.
-2. Use Claude Code as you normally do, in as many terminals as you like. Sessions show up on their own.
+2. Use your agents as you normally do, in as many terminals and tools as you like. Sessions show up on their own.
 3. Watch the **Needs your answer** list. Click an agent card to see its task, last message, token usage and working folder.
-4. Use the filter (All, Working, Waiting, Done) to focus.
+4. Use the tool chips (All, Claude Code, Codex CLI, Cursor) and the status filter (All, Working, Waiting, Done) to focus.
 
-If Raqeeb finds no session from the last 24 hours it shows the setup screen, not sample data.
+If Raqeeb finds no session from the last 24 hours in any tool it shows the setup screen, not sample data.
 
 ### Options
 
@@ -75,16 +75,32 @@ raqeeb [options]
 
   --demo           start in demo mode with sample data
   --port, -p N     port to listen on (default 4317, or $PORT)
-  --dir PATH       Claude Code projects folder (fixes the folder for this run)
+  --claude-dir PATH  Claude Code projects folder (--dir is the same)
+  --codex-dir PATH   Codex CLI sessions folder
+  --cursor-dir PATH  Cursor projects folder
   --version, -v    print the version
   --help, -h       show help
 ```
 
-The folder is chosen in this order: `--dir`, the folder you saved on the setup screen, then the default `~/.claude/projects`. If you set `CLAUDE_CONFIG_DIR`, it reads `$CLAUDE_CONFIG_DIR/projects` instead. Use `--dir` for any other location.
+For each tool the folder is chosen in this order: its command-line option, the folder you saved on the setup screen, then the default in the table below.
+
+## Supported agents
+
+| Tool | Status | Default folder | What Raqeeb reads | Based on |
+| --- | --- | --- | --- | --- |
+| Claude Code | supported | `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`) | session `.jsonl`: task, branch, model, token usage | [Claude Code docs for the location; format notes at harnessnotes.com](https://harnessnotes.com/session-transcripts/format) |
+| Codex CLI | **experimental** | `~/.codex/sessions` (or `$CODEX_HOME/sessions`) | `rollout-*.jsonl`: session_meta, turn_context, event_msg (user and agent messages, token_count) | [agenthud schema notes](https://github.com/neochoon/agenthud/blob/main/docs/schemas/codex-session.md), [harnessnotes](https://harnessnotes.com/session-transcripts/format), [bough.run](https://www.bough.run/articles/what-is-in-a-codex-rollout-file) |
+| Cursor | **experimental** | `~/.cursor/projects` | `*/agent-transcripts/<id>/<id>.jsonl` (Cursor Agent CLI and Agents window) | [harnessnotes](https://harnessnotes.com/session-transcripts/format), [agent-sessions guide](https://jazzyalex.github.io/agent-sessions/guides/cursor-agent-local-history.html), [vibecorral](https://vibecorral.com/cursor-cli) |
+
+**What "experimental" means here.** None of these tools publishes an official log format. The Codex and Cursor readers were written from the community format notes linked above and tested only with sample files built from those notes. The author has not run them against a real Codex or Cursor install. They may miss fields or break after a tool update. They are marked **beta** in the dashboard for that reason. If one misreads your logs, please open an issue (without pasting private code).
+
+Cursor specifics: Raqeeb reads the plain-text transcript copy that the Cursor Agent keeps. That copy has no token counts, so Cursor cards show "no usage data". The editor's own sidebar chats live in a SQLite database (`state.vscdb`) and are **not** read. Codex specifics: token counts come from the `token_count` events; Codex has no price table in Raqeeb, so it shows tokens only.
+
+Want another tool? See [CONTRIBUTING.md](CONTRIBUTING.md#adding-an-agent-provider). It is one small file.
 
 ## How it decides what an agent is doing
 
-Raqeeb reads the session logs (`.jsonl` files) Claude Code writes, read-only, and never changes them.
+Raqeeb reads the session logs (`.jsonl` files) each tool writes, read-only, and never changes them. The same rules apply to every tool.
 
 | Status | Rule |
 | --- | --- |
@@ -97,11 +113,11 @@ Sessions untouched for 24 hours are hidden.
 
 ## Honest limitations
 
-- **Claude Code only** for now. Other agents (Codex, Cursor, Aider and so on) are not read yet.
+- **Three tools for now.** Claude Code, Codex CLI and Cursor. Aider, Gemini CLI and others are not read yet. Codex and Cursor are experimental (see above).
 - **Status is a guess.** It comes from file timestamps and whether the last message was a question. An agent that asks something without a question mark will look "idle" or "done". A long tool run with no output can look idle.
-- **Cost is an estimate.** It uses the input, cache-write and output token counts with example per-token rates in [`lib/pricing.js`](lib/pricing.js). Cache reads are not counted. Rates change and plans differ, so treat the number as a rough guide, not a bill. Edit the file to match your rates.
+- **Cost is an estimate, and only where a rate is set.** Claude Code uses example per-token rates in [`lib/pricing.js`](lib/pricing.js), with cache reads not counted. Codex and Cursor have no rates, so they show tokens (or "no usage data") and are left out of the dollar total, which says how many are unpriced. Rates change and plans differ, so treat the number as a rough guide, not a bill. Add rates in that file if you want them.
 - **It only watches.** You cannot answer or approve from the dashboard yet. Go back to the terminal to reply.
-- **Tested with sample session files** that follow Claude Code's log format and with the automated tests below. If your real logs look different and something shows wrong, please open an issue.
+- **Tested with sample files, not real installs.** The automated tests use fixture files written from each tool's published format notes. Nothing has been checked against real Claude Code, Codex or Cursor logs yet. If your real logs look different and something shows wrong, please open an issue.
 
 ## Roadmap: Raqeeb Pro (not built yet)
 
@@ -125,15 +141,17 @@ Layout:
 
 ```
 server.js         the HTTP server and command-line options
-lib/sessions.js   reads and classifies Claude Code sessions
-lib/pricing.js    example token rates
+lib/sessions.js   combines all providers into one list
+lib/providers/    one adapter per tool (claude, codex, cursor)
+lib/common.js     shared scanning, status and parse cache
+lib/pricing.js    example token rates (Claude only)
 public/           the dashboard (plain HTML, CSS and JavaScript)
 test/             automated tests
 ```
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Good first things: support for another coding agent's log format, better status detection, and real-session bug reports.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Good first things: an adapter for another coding agent (it is one file), better status detection, and real-session bug reports.
 
 ## Privacy and security
 
