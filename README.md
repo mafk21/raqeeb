@@ -4,6 +4,8 @@
 
 Raqeeb means "watcher" in Arabic. If you run more than one agent at once, often more than one kind, you lose track of them: which one is still working, which one stopped to ask you something, and what the day is costing. Raqeeb puts all of that on one page, on your own machine.
 
+![Raqeeb demo: while you were away, a question inbox, handoff notes](docs/demo.gif)
+
 ![Raqeeb dashboard, light mode](docs/dashboard-light.png)
 
 ![When nothing is waiting: working agents below, tool filters on the right](docs/dashboard-calm.png)
@@ -13,6 +15,9 @@ Raqeeb means "watcher" in Arabic. If you run more than one agent at once, often 
 - **One board for every agent, from every tool.** Six tools side by side. Each card has a tool badge, project, branch, task, last message and a status: working, idle, waiting on you, or done. Filter by tool.
 - **An inbox of open questions.** When an agent ends its turn with a question, it shows up at the top under "Needs you", longest-waiting first.
 - **Spend per tool and per project.** An estimate where a price is known (Claude Code), and token counts only where it is not. Raqeeb never invents a price.
+- **Handoff notes.** Short notes saved in your repo so the next agent session knows what was done, decided and left open. Claude Code can read and write them through a small MCP server (`raqeeb mcp`).
+- **While you were away.** When you come back after 15+ minutes, a list of sessions that changed, with what each last said.
+- **Warning when two agents are in the same repo.**
 - **Light and dark mode**, and a layout that works on a phone-sized window.
 - **Local only.** Reads files already on your disk. No account, no telemetry, nothing uploaded. The server listens on `127.0.0.1`, so other machines cannot reach it.
 - **Zero dependencies.** One small Node program. Nothing to install besides Node.
@@ -42,6 +47,15 @@ node server.js
 **Option 3: download a ZIP**
 
 On the [repo page](https://github.com/mafk21/raqeeb), click **Code**, then **Download ZIP**. Unzip it, open a terminal in the folder, and run `node server.js`.
+
+**Option 4: install the `raqeeb` command**
+
+```
+npm install -g github:mafk21/raqeeb
+raqeeb
+```
+
+Throughout this README, `raqeeb ...` is the same as `node server.js ...` run inside the cloned folder. If you did not install it globally, the setup screen shows the full `node "/path/to/server.js" ...` form of each command for you to copy. Answering hooks point at that exact folder, so do not move or delete it afterwards (run the uninstall command first).
 
 Then open **http://localhost:4317** in your browser. The page refreshes every 5 seconds.
 
@@ -184,17 +198,6 @@ When two agent sessions are active (not finished, updated in the last 30 minutes
 - **Cost is an estimate, and only where a rate is set.** Claude Code uses example per-token rates in [`lib/pricing.js`](lib/pricing.js), with cache reads not counted. The other five have no rates, so they show tokens (or "no usage data") and are left out of the dollar total, which says how many are unpriced. Rates change and plans differ, so treat the number as a rough guide, not a bill. Add rates in that file if you want them.
 - **Answering works for three tools only.** Claude Code and Codex CLI after `raqeeb hooks install`, and Aider when started with `raqeeb wrap aider`. For Cursor, Gemini CLI and Cline Raqeeb still only watches, and the card says why (see [Answer from the dashboard](#answer-from-the-dashboard)). The Claude Code and Codex hooks were written from the tools' documentation and tested against a simulated hook caller, not a real install. The Aider wrapper was tested against a real Aider 0.86.2 (a Raqeeb click answered its prompt).
 - **Tested with sample files, not real installs.** The automated tests use fixture files written from each tool's published format notes. Nothing has been checked against real Claude Code, Codex or Cursor logs yet. If your real logs look different and something shows wrong, please open an issue.
-
-## Roadmap: Raqeeb Pro (not built yet)
-
-The app stays free for non-commercial use. A paid layer is planned for people who run agents all day:
-
-- Approve or redirect an agent from your phone
-- Limits on which files and commands an agent may touch
-- Alerts when a model's quality drops
-- Team features (shared policies, audit log)
-
-These do not exist yet and nothing in this repo is locked or phones home. If you want them, join the waitlist on the Raqeeb website and tell us what matters most.
 
 ## Development
 

@@ -124,3 +124,10 @@ test('wrap.py: a dashboard click types the key into the agent; typing in the ter
   assert.equal(JSON.parse((await view(t.port)).body).prompts.length, 0, 'card cleared after typing in the terminal');
   clearInterval(poll); c.kill(); t.close();
 });
+
+test('setup commands are runnable without a global install: they use node and the absolute server path', () => {
+  const hooks = require('../lib/hooks'), path = require('path');
+  const srv = path.join(__dirname, '..', 'server.js');
+  assert.ok(hooks.status('claude').install.startsWith('node "' + srv + '" hooks install claude'));
+  assert.ok(hooks.status('aider').install.startsWith('node "' + srv + '" wrap aider'));
+});

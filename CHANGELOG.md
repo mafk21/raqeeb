@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0
+- Raqeeb is now a free tool only. Removed the licence layer from 0.14.0 and the "Raqeeb Pro" panel, the FREE badge and the Pro roadmap in the README. No paid version is planned. Nothing here phones home. The noncommercial licence is unchanged.
+- First-run screen: the "Try demo" button is now at the top, not below the six tool panels.
+- Setup commands shown in the app now work without a global install (`node "/path/server.js" hooks install claude`). README adds `npm install -g github:mafk21/raqeeb` (checked: it installs the `raqeeb` command).
+- Added a demo animation to the README.
+
 ## 0.15.0
 - While you were away: when you come back after 15+ minutes, a list of sessions that changed since you last had the page open, with each one's current state and last words. Nothing is summarised (AI summaries are not built). The "last visit" time is stored in your browser only.
 
