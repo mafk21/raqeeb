@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+- Save handoff: a button in an agent's detail panel drafts a note from the agent's last message, the task, and the uncommitted files git shows. You edit it and press Save note. A last message that looks like it holds a key is left out of the draft. Fixed in the same change: a leading-space bug that cut the first letter off drafted file paths (caught by a test).
+- 2 new tests (39 total).
+
 ## 0.9.0
 - Handoffs: per-project notes stored in `<repo>/.raqeeb/handoff/`, a Handoffs page with a timeline, pinned project notes, a write form, Copy as prompt, Copy project context, Retire, and an "older than the code" marker. Secret pattern check and a 2 KB cap on every save. Demo mode shows labelled sample notes and saves nothing.
 - 8 new tests (37 total), plus a headless browser run on a real git repo.

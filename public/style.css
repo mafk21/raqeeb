@@ -149,3 +149,4 @@ body{font-family:"Space Grotesk","Inter",sans-serif}
 .hform label.chk{flex-direction:row;align-items:center;gap:8px;font-weight:500}
 @media(max-width:860px){.hcols{grid-template-columns:1fr}}
 .t-you{background:var(--bg2)}
+.draftnote{background:var(--amberbg);border:1.5px solid var(--ink);border-radius:6px;padding:8px 10px;margin-bottom:8px;color:var(--ink)}

@@ -91,3 +91,24 @@ test('demo mode: labelled sample notes, saving refused', async () => {
   assert.equal((await post(port, { action: 'save', cwd: '/tmp', title: 'x', body: 'y' })).code, 400);
   s.closeAllConnections(); s.close();
 });
+
+test('draft: last message, task as title, uncommitted files; a message with a key is left out; .raqeeb is excluded', async () => {
+  const d = repo(); fs.writeFileSync(path.join(d, 'src', 'a.js'), '2'); fs.writeFileSync(path.join(d, 'src', 'new file.js'), 'n');
+  handoff.save(d, { title: 'earlier', body: 'x' });
+  const t = handoff.draft({ cwd: d, provider: 'claude', task: 'Add retries\nto the queue', lastSay: 'Done.   Added retries.\nAll tests pass.' });
+  assert.equal(t.tool, 'claude'); assert.equal(t.title, 'Add retries to the queue'); assert.match(t.body, /^Done: Done\. Added retries\. All tests pass\.\nDecided: \nOpen: $/);
+  assert.deepEqual(t.files.sort(), ['src/a.js', 'src/new file.js']); assert.match(t.notice, /uncommitted/);
+  const k = handoff.draft({ cwd: d, provider: 'codex', task: 't', lastSay: 'use key sk-abcdefghijklmnopqrstuvwxyz1234' });
+  assert.ok(!/sk-/.test(k.body)); assert.match(k.notice, /key/);
+  const plain = h.tmp('raqeeb-nogit-'); assert.deepEqual(handoff.draft({ cwd: plain, provider: 'aider', task: 'x', lastSay: 'y' }).files, []);
+});
+
+test('API draft: by agent id, 404 for unknown ids and for demo', async () => {
+  const d = repo(), [srv, port] = await up(d);
+  const ag = JSON.parse((await h.req(port, '/api/agents')).body).agents[0];
+  const r = await h.req(port, '/api/handoff/draft?id=' + encodeURIComponent(ag.id)); assert.equal(r.code, 200);
+  const j = JSON.parse(r.body); assert.equal(j.tool, 'claude'); assert.equal(j.title, 'Task'); assert.match(j.body, /Done: Working\./);
+  assert.equal((await h.req(port, '/api/handoff/draft?id=nope')).code, 404);
+  assert.equal((await h.req(port, '/api/handoff/draft?id=x&demo=1')).code, 400);
+  srv.closeAllConnections(); srv.close();
+});

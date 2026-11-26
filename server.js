@@ -120,6 +120,13 @@ function createServer(opts) {
       const byRoot = new Map(); projectDirs().forEach(d => { const l = handoff.list(d); const k = l.root; if (!byRoot.has(k) || byRoot.get(k).cwd.length > d.length) byRoot.set(k, l); });
       return json(res, 200, { demo: false, projects: [...byRoot.values()].sort((a, b) => (b.notes.length + b.pinned.length) - (a.notes.length + a.pinned.length) || (a.project < b.project ? -1 : 1)) });
     }
+    if (url === '/api/handoff/draft' && req.method === 'GET') {
+      if (opts.demo || q.get('demo') === '1') return json(res, 400, { error: 'Demo agents are made up, so there is nothing to draft from.' });
+      const a = collect(opts, config.load()).agents.find(x => x.id === q.get('id'));
+      let cwd = ''; try { cwd = a && fs.realpathSync(a.cwd); } catch {}
+      if (!a || !cwd) return json(res, 404, { error: 'That agent session was not found, or its folder is gone.' });
+      return json(res, 200, handoff.draft({ ...a, cwd }));
+    }
     if (url === '/api/handoff' && req.method === 'POST') {
       if (!sameOrigin()) return json(res, 403, { error: 'Forbidden' });
       if (!/application\/json/.test(req.headers['content-type'] || '')) return json(res, 415, { error: 'Send JSON' });
